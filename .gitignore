@@ -59,6 +59,12 @@ reports/tables/*
 !reports/figures/phase10_*.png
 !reports/tables/phase10_*.csv
 !reports/tables/phase10_*.json
+!reports/figures/phase11_*.png
+!reports/tables/phase11_*.csv
+!reports/figures/phase12_*.png
+!reports/tables/phase12_*.csv
+!reports/figures/phase13_*.png
+!reports/tables/phase13_*.csv
 
 # OS
 .DS_Store

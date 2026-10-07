@@ -9,11 +9,5 @@ dependencies:
   - scipy
   - scikit-learn
   - matplotlib
-  - seaborn
   - jupyter
-  - sqlalchemy
-  - psycopg2
-  - xgboost
-  - shap
-  - statsmodels
-  - openpyxl
+  - pytest
