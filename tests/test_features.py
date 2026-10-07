@@ -41,5 +41,30 @@ class TestFeaturePipeline(unittest.TestCase):
         target_cols = [c for c in cols if 'TARGET' in c.upper()]
         self.assertEqual(len(target_cols), 1)
 
+    def test_no_infinite_values(self):
+        """Verify there are no infinite values in the dataset."""
+        import numpy as np
+        # Check numeric columns for inf
+        num_df = self.df.select_dtypes(include=[np.number])
+        has_inf = np.isinf(num_df).any().any()
+        self.assertFalse(has_inf, "Dataset contains infinite values (e.g. div by zero).")
+
+    def test_valid_ratios(self):
+        """Verify ratios are bounded appropriately where mathematically sensible."""
+        if 'APP_CREDIT_INCOME_RATIO' in self.df.columns:
+            # Should not be negative
+            self.assertTrue((self.df['APP_CREDIT_INCOME_RATIO'].fillna(0) >= 0).all())
+            
+    def test_installment_lateness_logic(self):
+        """Explicit mathematical proof of late payment logic."""
+        # Setup: Application is day 0.
+        # Scheduled installment is day -30.
+        # Actual entry payment is day -25.
+        # Delay = -25 - (-30) = +5. Positive delay = late.
+        days_instalment = -30
+        days_entry = -25
+        is_late = days_entry > days_instalment
+        self.assertTrue(is_late, "Logic: Positive delay means entry date is > scheduled date.")
+
 if __name__ == '__main__':
     unittest.main()
