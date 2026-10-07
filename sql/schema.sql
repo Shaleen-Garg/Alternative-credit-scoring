@@ -1,1 +1,42 @@
--- TODO: Implement schema definitions after dataset schema inspection.
+-- Schema definitions for SQLite (used for Feature Engineering pipeline)
+
+DROP TABLE IF EXISTS application_train;
+CREATE TABLE application_train (
+    SK_ID_CURR INTEGER PRIMARY KEY,
+    TARGET INTEGER,
+    AMT_INCOME_TOTAL REAL,
+    AMT_CREDIT REAL,
+    AMT_ANNUITY REAL,
+    DAYS_BIRTH INTEGER,
+    DAYS_EMPLOYED INTEGER,
+    EXT_SOURCE_1 REAL,
+    EXT_SOURCE_2 REAL,
+    EXT_SOURCE_3 REAL
+);
+
+DROP TABLE IF EXISTS bureau;
+CREATE TABLE bureau (
+    SK_ID_CURR INTEGER,
+    SK_ID_BUREAU INTEGER PRIMARY KEY,
+    CREDIT_ACTIVE TEXT,
+    DAYS_CREDIT INTEGER,
+    AMT_CREDIT_SUM REAL,
+    AMT_CREDIT_SUM_DEBT REAL
+);
+
+DROP TABLE IF EXISTS previous_application;
+CREATE TABLE previous_application (
+    SK_ID_PREV INTEGER PRIMARY KEY,
+    SK_ID_CURR INTEGER,
+    NAME_CONTRACT_STATUS TEXT
+);
+
+DROP TABLE IF EXISTS installments_payments;
+CREATE TABLE installments_payments (
+    SK_ID_PREV INTEGER,
+    SK_ID_CURR INTEGER,
+    DAYS_INSTALMENT REAL,
+    DAYS_ENTRY_PAYMENT REAL,
+    AMT_INSTALMENT REAL,
+    AMT_PAYMENT REAL
+);
