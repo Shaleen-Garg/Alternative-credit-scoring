@@ -28,7 +28,7 @@ Features derived from external traditional credit history.
 | `BUREAU_TOTAL_CREDIT` | bureau | `AMT_CREDIT_SUM` | `SUM(AMT_CREDIT_SUM)` | Point in time | Total historical credit extended | 0 | Uncertain | Low | Include |
 | `BUREAU_TOTAL_DEBT` | bureau | `AMT_CREDIT_SUM_DEBT`| `SUM(AMT_CREDIT_SUM_DEBT)` | Point in time | Total current traditional debt | 0 | Positive | Low | Include |
 | `BUREAU_DEBT_RATIO` | bureau | `AMT_CREDIT_SUM_DEBT`, `AMT_CREDIT_SUM` | `TOTAL_DEBT / TOTAL_CREDIT` | Point in time | Utilization of traditional credit | 0 | Positive | Low | Include |
-| `BUREAU_AVG_DAYS_CREDIT`| bureau | `DAYS_CREDIT` | `AVG(DAYS_CREDIT)` | Past history | Recency/age of credit history | Impute max (e.g. 0) | Negative (longer history=lower risk) | Low | Include |
+| `BUREAU_AVG_DAYS_CREDIT`| bureau | `DAYS_CREDIT` | `AVG(DAYS_CREDIT)` | Past history | Average recency of prior credit accounts, encoded as negative days relative to application | Impute max (e.g. 0) | Uncertain | Low | Include |
 
 ## Group C — Alternative Behavioural Features
 Features derived from internal interactions and historical payment behaviours.
