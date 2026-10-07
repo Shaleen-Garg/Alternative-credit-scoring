@@ -1,0 +1,7 @@
+feature_group,learner,thin_roc_auc,thin_pr_auc
+Application,Logistic,0.6910253446550221,0.2110241955211228
+Application + Bureau,Logistic,0.6910496238659477,0.2110871766089855
+Application + Bureau + Alternative,Logistic,0.7100003228618474,0.2379522509873577
+Application,HGB,0.7202413715171279,0.2424516490910316
+Application + Bureau,HGB,0.7179431117424854,0.2415745522984776
+Application + Bureau + Alternative,HGB,0.737646595421819,0.2786696131931878

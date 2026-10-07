@@ -48,23 +48,14 @@ data/processed/*
 # Generated outputs
 reports/figures/*
 reports/tables/*
+reports/final/*
 
 !reports/figures/.gitkeep
 !reports/tables/.gitkeep
-!reports/figures/phase8_*.png
-!reports/tables/phase8_*.csv
-!reports/figures/phase9_*.png
-!reports/tables/phase9_*.csv
-!reports/tables/phase9_*.json
-!reports/figures/phase10_*.png
-!reports/tables/phase10_*.csv
-!reports/tables/phase10_*.json
-!reports/figures/phase11_*.png
-!reports/tables/phase11_*.csv
-!reports/figures/phase12_*.png
-!reports/tables/phase12_*.csv
-!reports/figures/phase13_*.png
-!reports/tables/phase13_*.csv
+!reports/tables/phase*.csv
+!reports/tables/phase*.json
+!reports/final/*.csv
+!reports/final/*.png
 
 # OS
 .DS_Store

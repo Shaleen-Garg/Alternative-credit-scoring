@@ -1,12 +1,5 @@
-# SQL Queries
+# SQL feature pipeline
 
-SQL is used for:
-- relational joins
-- aggregation
-- behavioral feature engineering
-- temporal features
-- data-quality checks
-- analytical queries
+The project uses SQLite as a local relational layer. `src.features` initializes the schema from `schema.sql`, loads selected Home Credit CSVs, applies the joins and aggregations in `feature_queries.sql`, runs data checks from `data_quality.sql`, and exports the borrower-level feature table used by the model modules.
 
-The SQL-generated features should eventually feed the actual ML pipeline.
-Note: Feature queries will be implemented after the actual dataset schema has been inspected.
+Run the full rebuild from the repository root with `python -m src.features`. See [local data setup](../data/README.md) for the required files and [reproducibility](../docs/reproducibility.md) for the complete analysis sequence.

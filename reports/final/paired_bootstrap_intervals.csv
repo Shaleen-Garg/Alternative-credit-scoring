@@ -1,0 +1,4 @@
+cohort,n,roc_auc_delta,roc_auc_ci_low,roc_auc_ci_high,pr_auc_delta,pr_auc_ci_low,pr_auc_ci_high,bootstrap_resamples,interval_method
+Overall,46127,0.0088991731251002,0.0062271790702039,0.0117503019401606,0.0124308850064328,0.0074902007030764,0.0174094417607392,500,"paired percentile bootstrap, stratified by outcome; predictions fixed"
+Thin-file,6534,0.0197034836793336,0.0097250702224517,0.0293316307751913,0.0370950608947101,0.0168159946084628,0.0550056336721979,500,"paired percentile bootstrap, stratified by outcome; predictions fixed"
+Non-thin-file,39593,0.0073627131954104,0.0047004094916751,0.0103888498416196,0.0073085730657596,0.0025728301173036,0.011495084314925,500,"paired percentile bootstrap, stratified by outcome; predictions fixed"

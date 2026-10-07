@@ -1,75 +1,45 @@
 # Alternative Credit Scoring for Thin-File Borrowers
 
-## Overview
-This project investigates whether alternative behavioral and financial history can improve probability-of-default prediction for borrowers with limited traditional credit history.
+This project tests whether prior bureau history and internal payment behaviour add useful default-risk signal beyond current application data, with a specific focus on borrowers who have no bureau record. It uses the Home Credit Default Risk dataset and a frozen, stratified borrower split.
 
-## Research Question
-Can alternative behavioral and financial data improve credit-risk prediction for borrowers with limited traditional credit history?
+## Main result
 
-## Modeling Approach
+On the historical test split, adding alternative behavioural features improved ranking for both the logistic ablation and the nonlinear model. The largest measured gain is among thin-file borrowers.
+
+| Feature group | Logistic overall ROC-AUC / PR-AUC | HGB overall ROC-AUC / PR-AUC | Logistic thin-file ROC-AUC / PR-AUC | HGB thin-file ROC-AUC / PR-AUC |
+|---|---:|---:|---:|---:|
+| Application | 0.7294 / 0.2086 | 0.7446 / 0.2302 | 0.6910 / 0.2110 | 0.7202 / 0.2425 |
+| Application + Bureau | 0.7324 / 0.2122 | 0.7490 / 0.2385 | 0.6910 / 0.2111 | 0.7179 / 0.2416 |
+| Application + Bureau + Alternative | **0.7414 / 0.2217** | **0.7579 / 0.2509** | **0.7100 / 0.2380** | **0.7376 / 0.2787** |
+
+For HGB, Model C versus Model B gains **0.0089 ROC-AUC / 0.0124 PR-AUC overall** and **0.0197 / 0.0371 among thin-file borrowers**. These are results on one historical holdout that has already been inspected; they are not out-of-time validation or proof of production value.
+
+## Reproduce
+
+Use Python with the packages in `requirements.txt`. Keep the required local source CSVs in `data/raw/`; see [data setup](data/README.md). From the repository root, run:
+
 ```text
-Relational financial data
-        ↓
-PostgreSQL / SQL feature engineering
-        ↓
-Thin-file identification
-        ↓
-Statistical analysis
-        ↓
-Credit scorecard / Logistic Regression
-        ↓
-Controlled Logistic Regression ablation (A/B/C)
-        ↓
-Nonlinear robustness
-        ↓
-Probability calibration
-        ↓
-Illustrative decision analysis
-        ↓
-Model explanations and stability checks
+python -m src.features
+python -m src.nonlinear
+python -m src.phase10
+python -m src.phase11
+python -m src.phase12
+python -m src.phase13
+python -m src.release
+python -m pytest -q
 ```
 
-## Controlled Feature-Group Experiment
-The completed primary experiment compares:
-1. Application-only features
-2. Application + traditional credit information
-3. Application + traditional credit + alternative behavioral information
+The split-ID CSVs under `data/processed/splits/` define the only supported split. Generated features, databases, and raw data are not committed. Full setup and interpretation are in [reproducibility](docs/reproducibility.md).
 
-using the same stratified 70/15/15 train/validation/test split, preprocessing, and class-weighted Logistic Regression configuration. Results are evaluated for:
-- Overall population
-- Thin-file population
+## Results and project map
 
-The purpose is to estimate whether alternative information adds predictive value beyond application and bureau information, particularly for thin-file borrowers. Measured results and limitations are in [the Phase 8 report](docs/phase8_ablation.md).
+- [Final evaluation](docs/final_results.md): model comparison, calibration, decision analysis, explanations, stability checks, and limitations.
+- [Phase 8 controlled ablation](docs/phase8_ablation.md): experiment design and the primary linear comparison.
+- [Curated tables and figures](reports/final/): release-ready model/cohort comparisons, calibration, decision points, importance, and prediction stability.
+- `src/`: feature engineering and reproducible analysis modules.
+- `sql/`: SQLite schema, analytical feature queries, and data-quality checks.
+- `data/processed/splits/`: frozen train, validation, and test borrower IDs.
 
-## Evaluation
-Reported diagnostics include:
-- ROC-AUC
-- PR-AUC
-- Precision
-- Recall
-- Brier score
-- Log loss and calibration diagnostics
-- Confusion counts and illustrative expected cost
-- Validation permutation importance and split/cohort stability
+## Interpretation and intended use
 
-## Technology
-- Python
-- SQL feature engineering
-- pandas
-- NumPy
-- SciPy
-- scikit-learn
-- Matplotlib
-- Jupyter
-
-## Dataset
-The project uses the **Home Credit Default Risk** dataset.
-
-## Reproducibility
-The project freezes its application-level split IDs and keeps raw data local. See [the reproducibility instructions](docs/reproducibility.md) for the analysis sequence and data requirements.
-
-## Status
-**Phases 7A–13 complete:** application variables establish predictive signal; bureau history adds a modest increment; non-bureau behavioural history adds further signal. On the frozen historical holdout, logistic Model C improves over Model B by 0.0090 ROC-AUC/0.0095 PR-AUC overall and 0.0190/0.0269 among thin-file borrowers. The gain remains under HGB: Model C reaches **0.7579 ROC-AUC / 0.2509 PR-AUC**, with thin-file gains of 0.0197 ROC-AUC/0.0371 PR-AUC over Model B. Validation-selected sigmoid calibration preserves ranking and gives small overall calibration improvements; thin-file Brier/log loss improve slightly while ECE worsens slightly. Illustrative cost analysis finds modest overall decision differences and clearer thin-file gains at comparable approval volumes. Validation permutation importance shows signal from each feature group, led by application variables. Selected feature distributions and score distributions were close across the random splits, while performance varies across age and missing-score cohorts. These are observations from one historical dataset/holdout, not out-of-time performance, fairness proof, causality, real Ujjivan economics, or production banking utility. See [Phase 8](docs/phase8_ablation.md), [Phase 9](docs/phase9_nonlinear.md), [Phase 10](docs/phase10_calibration.md), [Phase 11](docs/phase11_decision_analysis.md), [Phase 12](docs/phase12_explainability.md), and [Phase 13](docs/phase13_stability.md).
-
-## Disclaimer
-This is an educational/research portfolio project and is not a production lending model.
+Decision costs are illustrative normalized units, not bank economics or a lending policy. Feature importance and local reason codes describe model behaviour and are not causal or automatically suitable for adverse-action notices. The analysis does not establish fairness, temporal stability, representativeness, or production readiness. This is an educational portfolio study, not a lending system.
