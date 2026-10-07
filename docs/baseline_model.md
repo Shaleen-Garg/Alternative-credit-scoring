@@ -39,7 +39,7 @@ All preprocessing parameters were learned strictly on the training set:
 | **ROC-AUC** | 0.7268 | 0.7315 | **0.7294** |
 | **PR-AUC** | 0.2024 | 0.2147 | **0.2085** |
 
-*Observation: There is no evidence of overfitting. The metrics remain remarkably stable across the training, validation, and untouched test set.*
+*Observation: Ranking metrics are close across these splits. The test set has since been inspected in Phase 8 and is not an untouched final holdout.*
 
 ## 6. Comparison Against Constant-Probability Baseline
 To ensure the logistic regression learned meaningful signals rather than simply defaulting to the base rate, it was compared to a dummy baseline that strictly predicts $P(default) = 0.0807$.
@@ -74,4 +74,4 @@ Sorted by absolute magnitude (standardized coefficients):
 ## 8. Limitations & Next Steps
 - This is merely the Application-only baseline.
 - It has not been formally calibrated to real-world default probabilities.
-- The next phases will add Traditional Credit (Bureau) and Alternative Behavioural groups, culminating in a gradient boosting ablation study to formally test the core hypothesis.
+- Subsequent work is documented in the Phase 8 controlled ablation, Phase 9 nonlinear comparison, and Phase 10 calibration reports.

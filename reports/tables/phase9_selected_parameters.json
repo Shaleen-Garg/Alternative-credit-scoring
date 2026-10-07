@@ -1,0 +1,13 @@
+{
+  "model": "HistGradientBoostingClassifier",
+  "parameters": {
+    "learning_rate": 0.08,
+    "max_iter": 200,
+    "max_leaf_nodes": 15,
+    "min_samples_leaf": 100,
+    "l2_regularization": 2.0
+  },
+  "selected_on": "Model C validation PR-AUC, ROC-AUC tie-break",
+  "random_state": 42,
+  "early_stopping": false
+}

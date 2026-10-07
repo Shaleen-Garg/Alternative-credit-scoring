@@ -1,0 +1,10 @@
+{
+  "selected_model_type": "HistGradientBoostingClassifier",
+  "selected_feature_group": "Application + Bureau + Alternative",
+  "feature_count": 24,
+  "selection_basis": "validation-only rank aggregation of overall and thin-file ROC-AUC/PR-AUC, train-validation ROC gap, then model complexity",
+  "calibration_method": "sigmoid",
+  "calibrator_fit_data": "validation predictions and labels only",
+  "calibration_method_selection": "held-out half of validation (stratified), minimizing log loss then Brier",
+  "test_used_for_model_or_calibrator_fit": false
+}

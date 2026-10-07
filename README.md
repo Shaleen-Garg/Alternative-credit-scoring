@@ -20,8 +20,7 @@ Credit scorecard / Logistic Regression
         ↓
 Controlled Logistic Regression ablation (A/B/C)
         ↓
-Later phases: nonlinear models, calibration, decisions,
-explainability, and stability analysis
+Nonlinear robustness and probability calibration
 ```
 
 ## Controlled Feature-Group Experiment
@@ -63,7 +62,7 @@ Planned metrics:
 The project uses the **Home Credit Default Risk** dataset.
 
 ## Status
-**Phases 7A, 7B, and 8 complete:** controlled Application, Application + Bureau, and Application + Bureau + Alternative baselines. Alternative history improves ranking performance in the current holdout experiment; this is an observational predictive result, not a causal or production claim.
+**Phases 7A–10 complete:** the frozen-split logistic ablation (Phase 8), HistGradientBoosting robustness comparison (Phase 9), and validation-selected probability calibration (Phase 10). On the Phase 8 test set, adding non-bureau history to application plus bureau features increased ROC-AUC by 0.0090 and PR-AUC by 0.0095 overall; in thin-file borrowers the changes were +0.0190 and +0.0269. The nonlinear Model C also improved over its Model B on the test set. Phase 8 test results were inspected during the earlier benchmark, so this is a reused historical holdout, not an untouched final test. Findings are predictive associations, not causal or production claims. See [Phase 8](docs/phase8_ablation.md), [Phase 9](docs/phase9_nonlinear.md), and [Phase 10](docs/phase10_calibration.md).
 
 ## Disclaimer
 This is an educational/research portfolio project and is not a production lending model.

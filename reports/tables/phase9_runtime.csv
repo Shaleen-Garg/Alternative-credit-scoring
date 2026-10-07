@@ -1,0 +1,5 @@
+model,model_type,fit_seconds,feature_count,learning_rate,max_iter,max_leaf_nodes,min_samples_leaf,l2_regularization
+Application,HistGradientBoostingClassifier,5.125686999999743,10,0.08,200,15,100,2.0
+Application + Bureau,HistGradientBoostingClassifier,5.531303300000218,16,0.08,200,15,100,2.0
+Application + Bureau + Alternative,HistGradientBoostingClassifier,7.508736499999941,24,0.08,200,15,100,2.0
+Full Phase 9 run,"including validation search, fits, metrics, importance, and plots",73.43324629999915,24,0.08,200,15,100,2.0

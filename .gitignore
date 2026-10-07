@@ -26,6 +26,9 @@ data/processed/*
 !data/raw/.gitkeep
 !data/interim/.gitkeep
 !data/processed/.gitkeep
+!data/processed/splits/
+!data/processed/splits/*.csv
+!data/processed/splits/README.md
 
 # Large data files
 *.csv
@@ -35,6 +38,7 @@ data/processed/*
 *.feather
 *.pkl
 *.pickle
+!data/processed/splits/*.csv
 
 # Databases
 *.db
@@ -49,6 +53,12 @@ reports/tables/*
 !reports/tables/.gitkeep
 !reports/figures/phase8_*.png
 !reports/tables/phase8_*.csv
+!reports/figures/phase9_*.png
+!reports/tables/phase9_*.csv
+!reports/tables/phase9_*.json
+!reports/figures/phase10_*.png
+!reports/tables/phase10_*.csv
+!reports/tables/phase10_*.json
 
 # OS
 .DS_Store
