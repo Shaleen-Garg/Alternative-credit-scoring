@@ -6,5 +6,8 @@
   "calibration_method": "sigmoid",
   "calibrator_fit_data": "validation predictions and labels only",
   "calibration_method_selection": "held-out half of validation (stratified), minimizing log loss then Brier",
-  "test_used_for_model_or_calibrator_fit": false
+  "base_model_fit_data": "training split only; reconstructed with Phase 9 parameters and preprocessing",
+  "base_model_preprocessing": "Phase 9 _tree_features: employment sentinel 365243 converted to NaN; native HGB missing-value handling",
+  "test_used_for_model_or_calibrator_fit": false,
+  "test_labels_used_for_model_selection_calibration_or_threshold_selection": false
 }

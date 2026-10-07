@@ -1,12 +1,12 @@
 """Select a frozen Phase 9 model on validation, calibrate, and evaluate once on test."""
 
 import json
+import hashlib
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.model_selection import train_test_split
 
 from src.calibration import (
@@ -14,7 +14,7 @@ from src.calibration import (
 )
 from src.evaluation import evaluate_model
 from src.models import FEATURE_GROUPS, load_and_split_data, build_pipeline, thin_file_mask
-from src.nonlinear import _new_model
+from src.nonlinear import _new_model, _tree_features
 
 
 def select_model_for_calibration(reports_dir="reports"):
@@ -24,6 +24,12 @@ def select_model_for_calibration(reports_dir="reports"):
     nonlinear = pd.read_csv(tables / "phase9_nonlinear_metrics.csv")
     cohort_linear = pd.read_csv(tables / "phase8_cohort_metrics.csv")
     cohort_nonlinear = pd.read_csv(tables / "phase9_nonlinear_cohort_metrics.csv")
+    # Remove test rows before any model ranking calculations; they are not
+    # inputs to selection, even indirectly.
+    linear = linear[linear.split.isin(["train", "validation"])]
+    nonlinear = nonlinear[nonlinear.split.isin(["train", "validation"])]
+    cohort_linear = cohort_linear[cohort_linear.split.eq("validation")]
+    cohort_nonlinear = cohort_nonlinear[cohort_nonlinear.split.eq("validation")]
     rows = []
     for model_type, metrics, cohorts in [
         ("Logistic Regression", linear, cohort_linear),
@@ -85,9 +91,20 @@ def run_phase10(filepath="data/processed/feature_master.csv",
     else:
         params = json.loads((tables / "phase9_selected_parameters.json").read_text(encoding="utf-8"))["parameters"]
         base_model = _new_model(params)
-    base_model.fit(X_train[features], y_train)
-    p_val = base_model.predict_proba(X_val[features])[:, 1]
-    p_test = base_model.predict_proba(X_test[features])[:, 1]
+    if model_type == "HistGradientBoostingClassifier":
+        # Match Phase 9 exactly: convert the employment sentinel to NaN before
+        # both model fitting and prediction. HGB handles the resulting missing
+        # values natively; passing the raw sentinel changes the fitted trees.
+        train_features = _tree_features(X_train, features)
+        val_features = _tree_features(X_val, features)
+        test_features = _tree_features(X_test, features)
+    else:
+        train_features, val_features, test_features = (
+            X_train[features], X_val[features], X_test[features]
+        )
+    base_model.fit(train_features, y_train)
+    p_val = base_model.predict_proba(val_features)[:, 1]
+    p_test = base_model.predict_proba(test_features)[:, 1]
 
     # Use one half of validation to fit calibrators and the other half to select a method.
     fit_idx, select_idx = train_test_split(
@@ -148,9 +165,49 @@ def run_phase10(filepath="data/processed/feature_master.csv",
         "calibration_method": selected_method,
         "calibrator_fit_data": "validation predictions and labels only",
         "calibration_method_selection": "held-out half of validation (stratified), minimizing log loss then Brier",
+        "base_model_fit_data": "training split only; reconstructed with Phase 9 parameters and preprocessing",
+        "base_model_preprocessing": "Phase 9 _tree_features: employment sentinel 365243 converted to NaN; native HGB missing-value handling",
         "test_used_for_model_or_calibrator_fit": False,
+        "test_labels_used_for_model_selection_calibration_or_threshold_selection": False,
     }
     (tables / "phase10_selected_model.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
+    if model_type == "HistGradientBoostingClassifier":
+        def ids_digest(frame):
+            payload = ",".join(map(str, frame.SK_ID_CURR.tolist())).encode("utf-8")
+            return hashlib.sha256(payload).hexdigest()
+        with open(filepath, "rb") as data_file:
+            feature_table_sha256 = hashlib.sha256(data_file.read()).hexdigest()
+        phase9_metrics = pd.read_csv(tables / "phase9_nonlinear_metrics.csv")
+        phase9_c = phase9_metrics[(phase9_metrics.split == "test") &
+                                  (phase9_metrics.model == model_name)].iloc[0]
+        raw_test = evaluate_model(y_test, p_test)
+        reconciliation = {
+            "feature_table": filepath,
+            "feature_table_sha256": feature_table_sha256,
+            "split_ids": {
+                "train": {"n": len(X_train), "sha256_in_file_order": ids_digest(X_train)},
+                "validation": {"n": len(X_val), "sha256_in_file_order": ids_digest(X_val)},
+                "test": {"n": len(X_test), "sha256_in_file_order": ids_digest(X_test)},
+                "test_order_matches_frozen_id_artifact": X_test.SK_ID_CURR.tolist() ==
+                    pd.read_csv(Path(split_dir) / "test_ids.csv").SK_ID_CURR.tolist(),
+            },
+            "feature_columns_in_order": features,
+            "missing_value_handling": "Phase 9 _tree_features; native HGB NaN handling",
+            "employment_sentinel": "APP_DAYS_EMPLOYED 365243 -> NaN before fit and prediction",
+            "model_parameters": json.loads((tables / "phase9_selected_parameters.json").read_text(encoding="utf-8")),
+            "fit_rows": "training split only; train+validation not used",
+            "target_extraction": "TARGET aligned by explicit split IDs and their persisted row order",
+            "phase9_test_roc_auc": float(phase9_c.roc_auc),
+            "phase9_test_pr_auc": float(phase9_c.pr_auc),
+            "phase10_uncalibrated_test_roc_auc": raw_test["roc_auc"],
+            "phase10_uncalibrated_test_pr_auc": raw_test["pr_auc"],
+            "test_metrics_match_phase9": bool(
+                np.isclose(raw_test["roc_auc"], phase9_c.roc_auc, atol=1e-12) and
+                np.isclose(raw_test["pr_auc"], phase9_c.pr_auc, atol=1e-12)),
+            "test_labels_used_for_any_selection_or_fit": False,
+        }
+        (tables / "phase10_reconciliation_audit.json").write_text(
+            json.dumps(reconciliation, indent=2), encoding="utf-8")
     return {"selection": selection, "calibration_selection": method_selection,
             "test_metrics": test_metrics, "reliability_bins": bins,
             "selected_model": record}

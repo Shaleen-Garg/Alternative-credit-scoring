@@ -1,0 +1,68 @@
+{
+  "feature_table": "data/processed/feature_master.csv",
+  "feature_table_sha256": "f0faa22643c8151b4daba1fe0e068b1203d319a690fc34f6d9727e413ad8ab5c",
+  "split_ids": {
+    "train": {
+      "n": 215257,
+      "sha256_in_file_order": "21f90eca902274473e1ad8aaaedecd0ef04240e995286627a3b2371bf5c0e3a7"
+    },
+    "validation": {
+      "n": 46127,
+      "sha256_in_file_order": "18ae4e0d5c5a4294dbfbd30a38da83aa406c1e17c2b8a793ca84e8376fce4966"
+    },
+    "test": {
+      "n": 46127,
+      "sha256_in_file_order": "8b1b51a5fd6ebdafdb6b3dbe71dbcc8c4feca803a5c10d7e441af426746d3b83"
+    },
+    "test_order_matches_frozen_id_artifact": true
+  },
+  "feature_columns_in_order": [
+    "APP_INCOME_TOTAL",
+    "APP_CREDIT_AMOUNT",
+    "APP_ANNUITY",
+    "APP_DAYS_BIRTH",
+    "APP_DAYS_EMPLOYED",
+    "APP_EXT_SOURCE_1",
+    "APP_EXT_SOURCE_2",
+    "APP_EXT_SOURCE_3",
+    "APP_CREDIT_INCOME_RATIO",
+    "APP_ANNUITY_INCOME_RATIO",
+    "BUREAU_CREDIT_COUNT",
+    "BUREAU_ACTIVE_COUNT",
+    "BUREAU_TOTAL_CREDIT",
+    "BUREAU_TOTAL_DEBT",
+    "BUREAU_DEBT_RATIO",
+    "BUREAU_AVG_DAYS_CREDIT",
+    "PREV_APP_COUNT",
+    "PREV_APPROVED_COUNT",
+    "PREV_REFUSED_COUNT",
+    "INST_TOTAL_COUNT",
+    "INST_LATE_PAYMENT_COUNT",
+    "INST_LATE_PAYMENT_RATIO",
+    "INST_UNDERPAYMENT_COUNT",
+    "INST_PAYMENT_MISSING_COUNT"
+  ],
+  "missing_value_handling": "Phase 9 _tree_features; native HGB NaN handling",
+  "employment_sentinel": "APP_DAYS_EMPLOYED 365243 -> NaN before fit and prediction",
+  "model_parameters": {
+    "model": "HistGradientBoostingClassifier",
+    "parameters": {
+      "learning_rate": 0.08,
+      "max_iter": 200,
+      "max_leaf_nodes": 15,
+      "min_samples_leaf": 100,
+      "l2_regularization": 2.0
+    },
+    "selected_on": "Model C validation PR-AUC, ROC-AUC tie-break",
+    "random_state": 42,
+    "early_stopping": false
+  },
+  "fit_rows": "training split only; train+validation not used",
+  "target_extraction": "TARGET aligned by explicit split IDs and their persisted row order",
+  "phase9_test_roc_auc": 0.7579041587379324,
+  "phase9_test_pr_auc": 0.2509442319102656,
+  "phase10_uncalibrated_test_roc_auc": 0.7579041587379324,
+  "phase10_uncalibrated_test_pr_auc": 0.2509442319102656,
+  "test_metrics_match_phase9": true,
+  "test_labels_used_for_any_selection_or_fit": false
+}
