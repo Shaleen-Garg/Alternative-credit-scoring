@@ -96,8 +96,8 @@ def _paired_bootstrap_deltas(y, p_b, p_c, n_bootstraps=500, seed=42):
             "interval_method": "paired percentile bootstrap, stratified by outcome; predictions fixed"}
 
 
-def run_phase13(filepath="data/processed/feature_master.csv", split_dir="data/processed/splits",
-                output_dir="reports"):
+def run_stability_analysis(filepath="data/processed/feature_master.csv", split_dir="data/processed/splits",
+                           output_dir="reports"):
     out = Path(output_dir)
     tables, figures = out / "tables", out / "figures"
     tables.mkdir(parents=True, exist_ok=True)
@@ -121,7 +121,7 @@ def run_phase13(filepath="data/processed/feature_master.csv", split_dir="data/pr
                                          "model": group, "n": int(mask.sum()),
                                          **_safe_metrics(targets[split][mask], predictions[split][group][mask])})
     performance = pd.DataFrame(performance_rows)
-    performance.to_csv(tables / "phase13_cohort_performance.csv", index=False)
+    performance.to_csv(tables / "cohort_performance.csv", index=False)
 
     bootstrap_rows = []
     test_thin = thin_file_mask(X_test).to_numpy()
@@ -133,7 +133,7 @@ def run_phase13(filepath="data/processed/feature_master.csv", split_dir="data/pr
                                    predictions["test"][MODEL_B][mask],
                                    predictions["test"][MODEL_C][mask])})
     bootstrap = pd.DataFrame(bootstrap_rows)
-    bootstrap.to_csv(tables / "phase13_model_c_minus_b_bootstrap_ci.csv", index=False)
+    bootstrap.to_csv(tables / "paired_bootstrap_intervals.csv", index=False)
 
     feature_rows = []
     for feature in STABILITY_FEATURES:
@@ -149,7 +149,7 @@ def run_phase13(filepath="data/processed/feature_master.csv", split_dir="data/pr
                                  "p90": float(nonmissing.quantile(.9)) if len(nonmissing) else np.nan,
                                  "psi_vs_train": 0.0 if split == "train" else _psi(train_values, values)})
     feature_stability = pd.DataFrame(feature_rows)
-    feature_stability.to_csv(tables / "phase13_feature_distribution_stability.csv", index=False)
+    feature_stability.to_csv(tables / "feature_distribution_stability.csv", index=False)
 
     missing_rows = []
     for split, frame in frames.items():
@@ -158,7 +158,7 @@ def run_phase13(filepath="data/processed/feature_master.csv", split_dir="data/pr
             missing_rows.append({"split": split, "feature": feature, "missing_n": int(miss.sum()),
                                  "missing_rate": float(miss.mean()), "present_n": int((~miss).sum())})
     missing_rates = pd.DataFrame(missing_rows)
-    missing_rates.to_csv(tables / "phase13_missingness_rates.csv", index=False)
+    missing_rates.to_csv(tables / "missingness_rates.csv", index=False)
 
     prediction_rows = []
     for split, frame in frames.items():
@@ -176,7 +176,7 @@ def run_phase13(filepath="data/processed/feature_master.csv", split_dir="data/pr
                                     "share_above_0_99": float(np.mean(p > .99)),
                                     "note": "train predictions are in-sample; validation/test are held-out"})
     prediction_stability = pd.DataFrame(prediction_rows)
-    prediction_stability.to_csv(tables / "phase13_prediction_stability.csv", index=False)
+    prediction_stability.to_csv(tables / "prediction_stability.csv", index=False)
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
     colors = {"train": "#4C78A8", "validation": "#F58518", "test": "#54A24B"}
@@ -191,7 +191,7 @@ def run_phase13(filepath="data/processed/feature_master.csv", split_dir="data/pr
     for ax in axes:
         ax.legend()
     fig.tight_layout()
-    fig.savefig(figures / "phase13_prediction_distributions.png", dpi=160, bbox_inches="tight")
+    fig.savefig(figures / "prediction_distributions.png", dpi=160, bbox_inches="tight")
     plt.close(fig)
 
     fig, axes = plt.subplots(1, len(STABILITY_FEATURES), figsize=(16, 4))
@@ -204,7 +204,7 @@ def run_phase13(filepath="data/processed/feature_master.csv", split_dir="data/pr
     axes[0].legend(fontsize=8)
     fig.suptitle("Selected feature distributions by split (non-missing values)")
     fig.tight_layout()
-    fig.savefig(figures / "phase13_feature_distributions.png", dpi=160, bbox_inches="tight")
+    fig.savefig(figures / "feature_distributions.png", dpi=160, bbox_inches="tight")
     plt.close(fig)
     return {"performance": performance, "feature_stability": feature_stability,
             "missingness_rates": missing_rates, "prediction_stability": prediction_stability,
@@ -212,7 +212,7 @@ def run_phase13(filepath="data/processed/feature_master.csv", split_dir="data/pr
 
 
 if __name__ == "__main__":
-    result = run_phase13()
+    result = run_stability_analysis()
     print(result["performance"].query("split == 'test' and cohort in ['Overall', 'Thin-file', 'Non-thin-file']").to_string(index=False))
     print(result["feature_stability"].to_string(index=False))
     print(result["prediction_stability"].to_string(index=False))

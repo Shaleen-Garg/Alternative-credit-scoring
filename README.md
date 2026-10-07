@@ -2,36 +2,27 @@
 
 > Evaluating whether alternative behavioural history improves default-risk prediction when traditional bureau history is limited.
 
-This project builds a borrower-level feature table from Home Credit application and historical account data, then compares three feature groups using Logistic Regression and HistGradientBoosting. The central question is whether previous application and installment-payment behaviour adds predictive signal for applicants with no bureau records.
+This project builds an applicant-level feature table from Home Credit application and historical account data. It tests whether previous application and installment-payment behaviour adds predictive signal beyond application and bureau variables, with particular focus on applicants with no bureau records.
 
-> **Adding alternative behavioural history improved HGB ROC-AUC from 0.7490 to 0.7579 overall, and from 0.7179 to 0.7376 among thin-file borrowers.**
+The target is the dataset's payment-difficulty outcome (TARGET = 1 for payment difficulty). The pipeline uses Python, SQLite and SQL, pandas, NumPy, scikit-learn, Matplotlib, and pytest.
 
-![Overall model comparison](reports/final/model_comparison.png)
+**Adding alternative behavioural history improved HGB ROC-AUC from 0.7490 to 0.7579 overall and from 0.7179 to 0.7376 among thin-file applicants.**
 
-## Overview
+![Overall model comparison](reports/results/model_comparison.png)
 
-The data is from the historical Home Credit Default Risk competition. It contains 307,511 applicants in the target-bearing `application_train.csv`. It is not current banking data, does not represent Ujjivan customers, and is not exclusively a thin-file population.
+## Problem and hypothesis
 
-A **thin-file borrower** is defined here as an applicant with `BUREAU_CREDIT_COUNT == 0`: no bureau records at the application point. This definition was fixed before the main modelling analysis. It identifies 44,020 applicants. Many still have non-bureau history: 41,550 have previous-application records, 41,640 have installment history, and 41,780 have one or both.
+Traditional bureau history can be sparse or absent for some applicants. Those applicants may still have prior applications and observed repayment behaviour in the historical data. The project tests whether those non-bureau signals improve default-risk ranking beyond current application and bureau information.
 
-The project tests whether those internal histories can supplement sparse bureau information. It does not assume that alternative behavioural history is universally better or that it should replace a bureau file.
+The source is the historical Home Credit Default Risk competition dataset. The target-bearing application_train file contains 307,511 applicants. This is not current banking data and does not represent a specific lender's customer population.
 
-## What the analysis found
-
-- Bureau history added a modest improvement over application features in the controlled comparison.
-- Alternative behavioural history added further predictive signal.
-- The Model B to Model C gain was more pronounced among thin-file borrowers.
-- HistGradientBoosting outperformed Logistic Regression in these comparisons.
-- Application external scores were the strongest individual predictors; alternative behavioural features contributed additional signal.
-- Calibration changes were modest and mixed.
-
-These are ranking and prediction results on a historical holdout. They do not establish reduced NPAs, faster approvals, monetary savings, or equivalent results at another lender.
+Thin-file is defined as BUREAU_CREDIT_COUNT = 0: no bureau records at the current application point. This definition was set before the main model comparison and identifies 44,020 applicants. Among them, 41,550 have previous-application history, 41,640 have installment history, and 41,780 have either.
 
 ## Data architecture
 
-The Home Credit data is relational. Current applications connect to bureau and prior applications; detailed bureau and account histories sit below those records. The diagram shows the dataset’s logical relationships. The shipped feature pipeline uses `application_train`, `bureau`, `previous_application`, and `installments_payments`; the other tables are shown for context and are not required to rebuild the current feature table.
+The source dataset is relational. The diagram shows logical relationships across its historical tables. The current feature builder uses application_train, bureau, previous_application, and installments_payments. The other competition tables are included here to clarify the full data structure, but are not consumed by this implementation.
 
-```mermaid
+~~~mermaid
 erDiagram
     APPLICATION ||--o{ BUREAU : "SK_ID_CURR"
     BUREAU ||--o{ BUREAU_BALANCE : "SK_ID_BUREAU"
@@ -65,69 +56,53 @@ erDiagram
         int SK_ID_PREV
         int SK_ID_CURR
     }
-```
+~~~
 
-`POS_CASH_balance`, `credit_card_balance`, and `installments_payments` also contain `SK_ID_CURR` in the source data. Their logical historical relationship is through `SK_ID_PREV`, which identifies the prior application.
+POS_CASH_balance, credit_card_balance, and installments_payments also contain SK_ID_CURR in the source files. Their logical historical relationship is through SK_ID_PREV, which identifies a prior application. bureau_balance is linked to a bureau record through SK_ID_BUREAU.
 
-| Table | Approx. rows | Grain and identifier | Relationship and role |
-|---|---:|---|---|
-| `application_train` | 307,511 | One current application; `SK_ID_CURR` | Target-bearing applicant population |
-| `bureau` | 1,716,428 | One historical bureau record; `SK_ID_BUREAU` | Linked to current applicant by `SK_ID_CURR` |
-| `bureau_balance` | 27,299,925 | Monthly status for a bureau record | Linked through `SK_ID_BUREAU` |
-| `previous_application` | 1,670,214 | One historical application; `SK_ID_PREV` | Linked to current applicant by `SK_ID_CURR` |
-| `POS_CASH_balance` | 10,001,358 | Historical POS/CASH balance record | Linked logically through `SK_ID_PREV` |
-| `credit_card_balance` | 3,840,312 | Historical credit-card balance record | Linked logically through `SK_ID_PREV` |
-| `installments_payments` | 13,605,401 | Historical installment/payment observation | Linked logically through `SK_ID_PREV` |
+| Source table | Approx. rows | Grain and role |
+|---|---:|---|
+| application_train | 307,511 | One current application; includes TARGET |
+| bureau | 1,716,428 | One external bureau record |
+| bureau_balance | 27,299,925 | Monthly status record for a bureau record |
+| previous_application | 1,670,214 | One historical application |
+| POS_CASH_balance | 10,001,358 | Historical POS/CASH account record |
+| credit_card_balance | 3,840,312 | Historical credit-card account record |
+| installments_payments | 13,605,401 | Historical installment/payment observation |
 
-### SQL feature engineering
+The pipeline aggregates historical rows before joining them to the current application table. Grouping by applicant or prior application first avoids one-to-many join fan-out and preserves one modeling row per applicant.
 
-The feature pipeline uses SQL to aggregate historical records before joining them to the one-row-per-applicant application table. This keeps the model table at borrower grain and avoids multiplying application rows through joins to one-to-many histories.
-
-```text
-Many historical rows
-        ↓
-Aggregate by applicant or prior application
-        ↓
-Join applicant-level summaries to application
-        ↓
-One row per current application
-        ↓
-Model-ready feature table
-```
-
-The raw files are not stored in this repository. Obtain them separately from the Home Credit Default Risk competition and follow its access and use terms. Rebuilding the current feature table requires `application_train.csv`, `bureau.csv`, `previous_application.csv`, and `installments_payments.csv` in `data/raw/`.
+The raw files are not included in this repository and must be obtained separately. The competition source files are application_train.csv, bureau.csv, bureau_balance.csv, previous_application.csv, POS_CASH_balance.csv, credit_card_balance.csv, installments_payments.csv, and HomeCredit_columns_description.csv. Put them in data/raw/. The current feature builder requires application_train.csv, bureau.csv, previous_application.csv, and installments_payments.csv; the remaining files provide dataset context but are not consumed by the current pipeline. See [data setup](data/README.md).
 
 ## Feature groups
 
 The controlled comparison adds feature groups in sequence:
 
-```text
+~~~text
 A  Application
-   ↓ add bureau history
+   ↓
 B  Application + Traditional Bureau
-   ↓ add internal behavioural history
+   ↓
 C  Application + Traditional Bureau + Alternative Behaviour
-```
+~~~
 
-The models use the same frozen borrowers, split, and core preprocessing; the feature groups change across A, B, and C. Logistic Regression provides the controlled linear comparison. HistGradientBoosting checks whether the pattern holds with a nonlinear model.
+The same borrowers, frozen split, and core preprocessing are used across A/B/C. The feature groups are the controlled change.
 
-| Feature group | Example features | Count |
+| Group | Examples | Features |
 |---|---|---:|
-| Application | Income, credit amount, annuity, age, employment duration, external scores, credit/income and annuity/income ratios | 10 |
-| Traditional bureau | Bureau credit and active counts, total credit and debt, debt ratio, average credit recency | 6 |
-| Alternative behavioural | Prior application, approval and refusal counts; installment count, late count and ratio, underpayment count, missing-payment-information count | 8 |
+| Application | Income, credit amount, annuity, age, employment duration, three external scores, credit/income and annuity/income ratios | 10 |
+| Traditional bureau | Credit and active counts, total credit and debt, debt ratio, average credit recency | 6 |
+| Alternative behaviour | Previous/approved/refused application counts; installment volume, observed late and underpayment counts, late-payment ratio, missing-payment-information count | 8 |
 
-Alternative behavioural features matter because an applicant may have little or no bureau history while still having previous applications or observed repayment behaviour with the lender represented in this dataset.
+PREV_APPROVED_COUNT summarizes prior application outcomes. INST_LATE_PAYMENT_RATIO measures observed late installments relative to records with observed payment and scheduled dates. Both contribute meaningful non-application signal in the fitted model.
 
-In particular, `PREV_APPROVED_COUNT` summarizes prior application outcomes, while `INST_LATE_PAYMENT_RATIO` measures observed installment lateness relative to installments with observed payment and scheduled dates. Both are among the stronger non-application predictors in the fitted model.
+### Unspecified installment missingness
 
-### Missing installment information
-
-The source contains 2,905 installment rows where both `DAYS_ENTRY_PAYMENT` and `AMT_PAYMENT` are missing. The source does not specify what those missing values mean. The pipeline excludes these rows from observed late- and underpayment counts and represents them separately with `INST_PAYMENT_MISSING_COUNT`. It does not assume they were unpaid or successfully paid.
+In 2,905 of 13,605,401 raw installment rows, both DAYS_ENTRY_PAYMENT and AMT_PAYMENT are missing. The source does not explain what those records mean. They are excluded from observed late- and underpayment counts and represented separately by INST_PAYMENT_MISSING_COUNT. The feature design does not infer that the missing events were unpaid or on time.
 
 ## Modelling and evaluation
 
-The modelling population is split at borrower level into stratified train, validation, and test sets:
+The target is the supplied Home Credit payment-difficulty outcome. TARGET and SK_ID_CURR are not predictors. The borrower-level modeling table is split into fixed, stratified train/validation/test sets:
 
 | Split | Applicants |
 |---|---:|
@@ -135,22 +110,31 @@ The modelling population is split at borrower level into stratified train, valid
 | Validation | 46,127 |
 | Test | 46,127 |
 
-This is a 70/15/15 split. The borrower IDs are frozen in `data/processed/splits/` and reused across phases. The repository commits those ID files, but not raw data or the processed feature table.
+The 70/15/15 split IDs are committed under data/processed/splits/ and reused across analyses. Preprocessing is fitted using training data. Logistic Regression is the controlled linear comparison; HistGradientBoosting (HGB) checks whether the feature-group result holds with a nonlinear model. The selected HGB configuration is chosen using validation data and shared across A/B/C.
 
-The analysis proceeds from controlled Logistic Regression feature-group ablation to a nonlinear HistGradientBoosting comparison. The selected HGB Model C uses validation-based model selection. A sigmoid calibration mapping is selected using validation data. Decision thresholds are also selected on validation. The historical test split is used for final reporting and predefined diagnostics; it had already been inspected during earlier benchmarking, so it is **not** an untouched confirmatory test.
+Calibration uses a sigmoid mapping selected on validation predictions and outcomes. Decision thresholds are also selected on validation. Test outcomes are used for final reporting and predefined diagnostics, not model, calibration-method, or threshold selection. The historical test split had been inspected during earlier benchmarking; it is not an untouched confirmatory test.
 
-### Leakage and evaluation controls
-
-- `TARGET` is not included as a predictor, and `SK_ID_CURR` is not used as a predictor.
-- Historical sources are aggregated to applicant level before modelling.
-- Preprocessing is fitted using training data.
-- Model selection, calibration, and threshold selection use validation data.
-- Frozen borrower IDs are reused across the analysis phases.
-- Test outcomes are reserved for final evaluation and predefined diagnostics; they do not select the model, calibrator, or thresholds.
+~~~mermaid
+flowchart TD
+    A[Home Credit source tables] --> B[SQLite relational aggregation]
+    B --> C[Applicant-level feature table]
+    C --> D[Thin-file cohort definition]
+    D --> E[Frozen train / validation / test IDs]
+    E --> F[Controlled A/B/C comparison]
+    F --> G[Logistic Regression]
+    F --> H[HistGradientBoosting]
+    H --> I[Validation-selected calibration]
+    I --> J[Illustrative decision analysis]
+    H --> K[Model-reliance explanations]
+    H --> L[Cohort and stability diagnostics]
+    J --> M[Results]
+    K --> M
+    L --> M
+~~~
 
 ## Results
 
-### Overall final-holdout performance
+### Overall historical holdout
 
 | Feature group | Logistic ROC-AUC | Logistic PR-AUC | HGB ROC-AUC | HGB PR-AUC |
 |---|---:|---:|---:|---:|
@@ -158,9 +142,7 @@ The analysis proceeds from controlled Logistic Regression feature-group ablation
 | Application + Bureau | 0.7324 | 0.2122 | 0.7490 | 0.2385 |
 | Application + Bureau + Alternative | **0.7414** | **0.2217** | **0.7579** | **0.2509** |
 
-![Thin-file model comparison](reports/final/thin_file_comparison.png)
-
-### Thin-file final-holdout performance
+### Thin-file historical holdout
 
 | Feature group | Logistic ROC-AUC | Logistic PR-AUC | HGB ROC-AUC | HGB PR-AUC |
 |---|---:|---:|---:|---:|
@@ -168,27 +150,29 @@ The analysis proceeds from controlled Logistic Regression feature-group ablation
 | Application + Bureau | 0.6910 | 0.2111 | 0.7179 | 0.2416 |
 | Application + Bureau + Alternative | **0.7100** | **0.2380** | **0.7376** | **0.2787** |
 
-For HGB, adding alternative behavioural history from Model B to Model C improved:
+![Thin-file model comparison](reports/results/thin_file_comparison.png)
+
+For HGB, Model C minus Model B gains were:
 
 | Cohort | ROC-AUC gain | PR-AUC gain |
 |---|---:|---:|
 | Overall | +0.0089 | +0.0124 |
 | Thin-file | +0.0197 | +0.0371 |
 
-Paired bootstrap intervals for the Model C minus Model B gains:
+Paired, outcome-stratified bootstrap intervals from 500 resamples of fixed predictions:
 
-| Cohort | ROC-AUC gain (95% CI) | PR-AUC gain (95% CI) |
+| Cohort | ROC-AUC gain (95% interval) | PR-AUC gain (95% interval) |
 |---|---:|---:|
 | Overall | +0.0089 [0.0062, 0.0118] | +0.0124 [0.0075, 0.0174] |
 | Thin-file | +0.0197 [0.0097, 0.0293] | +0.0371 [0.0168, 0.0550] |
 
-These intervals quantify resampling uncertainty within this historical holdout. They do **not** establish out-of-time stability or generalization to another lender or time period.
+These intervals describe resampling uncertainty within this historical holdout. They do not establish out-of-time stability or generalization to another institution.
 
-## Calibration
+## Calibration and decision analysis
 
-The selected model is HGB Model C. Sigmoid calibration preserves its ranking metrics: ROC-AUC 0.757904 and PR-AUC 0.250944.
+For the selected HGB Model C, sigmoid calibration preserves ranking (ROC-AUC 0.757904; PR-AUC 0.250944). Calibration improvement is modest and mixed rather than perfect.
 
-| Cohort | Metric | Raw | Sigmoid |
+| Cohort | Measure | Raw | Sigmoid |
 |---|---|---:|---:|
 | Overall | Brier score | 0.067541 | 0.067537 |
 | Overall | Log loss | 0.245562 | 0.245538 |
@@ -197,123 +181,140 @@ The selected model is HGB Model C. Sigmoid calibration preserves its ranking met
 | Thin-file | Log loss | 0.291252 | 0.291187 |
 | Thin-file | 15-bin ECE | 0.005440 | 0.006581 |
 
-Calibration improvement is **modest and mixed rather than perfect**: thin-file Brier and log loss improve slightly, while thin-file ECE increases slightly.
+![Calibration reliability](reports/results/calibration_reliability.png)
 
-![Calibration reliability](reports/final/calibration_reliability.png)
+At an illustrative 5:1 false-negative:false-positive normalized cost ratio, validation selected an overall threshold of 0.15. On the historical holdout, Model C approval was 86.03%, default recall 41.78%, defaults among approved 5.46%, and normalized cost 0.3409 per applicant. These values are illustrative, not lending policy, bank economics, or underwriting recommendations.
 
-## Illustrative decision analysis
+At validation-selected cutoffs targeting approximately 70% approval, thin-file results were:
 
-At an illustrative 5:1 false-negative:false-positive normalized cost ratio, the overall threshold selected on validation is 0.15. On the final historical holdout, Model C has 86.03% approval, 41.78% default recall, 5.46% defaults among approved, and 0.3409 normalized cost per applicant.
-
-At validation-selected cutoffs targeting approximately 70% approval, the thin-file comparison is:
-
-| Model | Test approval | Default recall | Defaults among approved |
+| Model | Holdout approval | Default recall | Defaults among approved |
 |---|---:|---:|---:|
-| Model B: Application + Bureau | 69.39% | 59.03% | 5.96% |
-| Model C: Application + Bureau + Alternative | 69.71% | 61.61% | 5.55% |
+| Application + Bureau | 69.39% | 59.03% | 5.96% |
+| Application + Bureau + Alternative | 69.71% | 61.61% | 5.55% |
 
-These are **illustrative** comparisons under assumed relative costs. They are not lending policy, bank economics, or production underwriting recommendations.
+![Illustrative decision trade-off](reports/results/decision_tradeoff.png)
 
-![Illustrative decision trade-off](reports/final/decision_tradeoff.png)
+## Model interpretation and stability
 
-## What drives the model?
-
-Validation permutation importance shows that application external scores are the strongest individual signals. Behavioural history also contributes incremental information.
+Validation permutation importance is led by application external scores. Previous approval count and installment late-payment ratio contribute alternative behavioural signal; BUREAU_DEBT_RATIO is an important bureau feature.
 
 | Feature | Validation average-precision decrease |
 |---|---:|
-| `APP_EXT_SOURCE_2` | 0.0637 |
-| `APP_EXT_SOURCE_3` | 0.0541 |
-| `APP_EXT_SOURCE_1` | 0.0278 |
-| `APP_DAYS_BIRTH` | 0.0132 |
-| `APP_DAYS_EMPLOYED` | 0.0114 |
-| `PREV_APPROVED_COUNT` | 0.0095 |
-| `INST_LATE_PAYMENT_RATIO` | 0.0089 |
+| APP_EXT_SOURCE_2 | 0.0637 |
+| APP_EXT_SOURCE_3 | 0.0541 |
+| APP_EXT_SOURCE_1 | 0.0278 |
+| APP_DAYS_BIRTH | 0.0132 |
+| APP_DAYS_EMPLOYED | 0.0114 |
+| PREV_APPROVED_COUNT | 0.0095 |
+| INST_LATE_PAYMENT_RATIO | 0.0089 |
 
-`BUREAU_DEBT_RATIO` is an important bureau-side feature. Permutation importance measures model reliance, not causality.
+Permutation importance measures model reliance, not causality. Local explanation diagnostics use one-feature-at-a-time replacement with the training median; they are not SHAP values and are not automatically suitable as regulatory adverse-action reasons.
 
-Local explanation diagnostics use one-feature-at-a-time replacement with the training median. They are **not SHAP values** and are not automatically suitable as regulatory adverse-action reasons.
+Train-decile PSI for selected features was below 0.0003 on validation and test. Cohort performance varies, and estimates for small slices are uncertain.
 
-![Validation feature importance](reports/final/feature_importance.png)
+![Validation feature importance](reports/results/feature_importance.png)
 
-## Stability and responsible checks
+![Prediction stability](reports/results/prediction_stability.png)
 
-Paired bootstrap intervals for Model C minus Model B were positive in the overall, thin-file, and non-thin-file cohorts. Train-decile PSI values for selected features were below 0.0003 on validation and test, and the score summaries were broadly similar across the random splits. Performance varies across cohorts, and small slices have uncertain estimates.
+## Reproducibility
 
-These checks do not establish fairness certification, legal sufficiency, out-of-time performance, causal effects, or production readiness.
+Use Python 3.10 and install requirements from requirements.txt. Put the competition files listed above in data/raw/. From the repository root, run:
 
-![Prediction stability](reports/final/prediction_stability.png)
-
-## Reproduce the analysis
-
-Use Python 3.10 or later and install the dependencies from `requirements.txt`. Place the required raw CSVs in `data/raw/`. From the repository root, run:
-
-```bash
+~~~bash
 python -m pip install -r requirements.txt
 python -m src.features
+python -m src.ablation
 python -m src.nonlinear
-python -m src.phase10
-python -m src.phase11
-python -m src.phase12
-python -m src.phase13
+python -m src.calibration_analysis
+python -m src.decision_analysis
+python -m src.explainability
+python -m src.stability_analysis
 python -m src.release
 python -m pytest -q
-```
+~~~
 
-`src.features` builds the local SQLite database and borrower-level feature table. The phase modules run the model comparison, calibration, decision, explanation, and stability analyses. `src.release` assembles the curated tables and figures under `reports/final/`. The final test suite passed: **26 passed**. Results may vary in runtime or bit-level detail across machines and environments.
+The feature builder writes a local SQLite database and data/processed/feature_master.csv. Detailed intermediate outputs are generated under reports/tables/ and reports/figures/ and are not tracked. Curated tables and figures are stored under reports/results/. The test suite last passed with 26 tests. See [reproduction details](docs/reproducibility.md).
 
 ## Repository structure
 
-```text
+~~~text
 .
 ├── data/
-│   ├── raw/                 # Local source files; not committed
-│   ├── interim/             # Local SQLite database; not committed
-│   ├── processed/           # Local feature table; not committed
-│   │   └── splits/          # Frozen borrower IDs and split notes
+│   ├── raw/                     # Local source data; only .gitkeep is committed
+│   ├── interim/                 # Local database; only .gitkeep is committed
+│   ├── processed/
+│   │   ├── .gitkeep
+│   │   └── splits/
+│   │       ├── README.md
+│   │       ├── train_ids.csv
+│   │       ├── validation_ids.csv
+│   │       └── test_ids.csv
 │   └── README.md
 ├── docs/
-│   ├── final_results.md
-│   ├── reproducibility.md
-│   ├── interview_summary.md
-│   ├── resume_results.md
-│   ├── phase8_ablation.md
-│   ├── feature_specification.md
+│   ├── data_dictionary.md
+│   ├── feature_engineering.md
 │   ├── feature_validation.md
-│   ├── data_dictionary_notes.md
-│   └── leakage_audit.md
+│   ├── methodology.md
+│   ├── results.md
+│   └── reproducibility.md
 ├── reports/
-│   ├── final/               # Curated figures and summary tables
-│   └── tables/              # Phase-level metrics and audit records
+│   └── results/
+│       ├── calibration_reliability.png
+│       ├── calibration_summary.csv
+│       ├── decision_at_70pct_approval.csv
+│       ├── decision_tradeoff.png
+│       ├── feature_importance.png
+│       ├── model_comparison.csv
+│       ├── model_comparison.png
+│       ├── paired_bootstrap_intervals.csv
+│       ├── prediction_stability.png
+│       ├── test_cohort_comparison.csv
+│       ├── thin_file_comparison.png
+│       └── thin_file_model_comparison.csv
 ├── sql/
+│   ├── README.md
 │   ├── schema.sql
 │   ├── feature_queries.sql
-│   ├── data_quality.sql
-│   └── analytical_queries.sql
-├── src/                     # Feature build, modelling, analysis, reporting
+│   └── data_quality.sql
+├── src/
+│   ├── ablation.py
+│   ├── calibration.py
+│   ├── calibration_analysis.py
+│   ├── data.py
+│   ├── decision_analysis.py
+│   ├── evaluation.py
+│   ├── explainability.py
+│   ├── features.py
+│   ├── frozen_model.py
+│   ├── models.py
+│   ├── nonlinear.py
+│   ├── release.py
+│   ├── stability_analysis.py
 ├── tests/
-├── environment.yml
-├── requirements.txt
+│   ├── test_calibration.py
+│   ├── test_decisions.py
+│   ├── test_features.py
+│   ├── test_models.py
+│   ├── test_pipeline.py
+│   └── test_validation.py
+├── .gitignore
 ├── LICENSE
-└── README.md
-```
+├── README.md
+├── requirements.txt
+└── environment.yml
+~~~
 
 ## Limitations
 
-- The dataset is historical and comes from one competition setting; it is not current banking data or a Ujjivan customer sample.
-- Evaluation uses a random holdout, not out-of-time validation. The test split was inspected during earlier benchmarking, and there is no independent external validation.
-- Bootstrap intervals quantify resampling uncertainty within this holdout; they do not show performance across time or institutions.
-- No fairness certification, causal effect, applicant utility analysis, legal/adverse-action validation, or production monitoring is established.
-- Decision costs are illustrative and are not based on real lending economics.
-- Missing installment-payment semantics are uncertain in the source data; the analysis represents this uncertainty rather than inventing an outcome.
-- This project does not demonstrate production underwriting readiness.
-
-## Why this project is useful in an interview
-
-The project provides concrete examples of relational SQL thinking, borrower-level feature engineering, credit-risk modelling, controlled experimentation, validation discipline, class-imbalance-aware evaluation, calibration, threshold analysis, explainability, reproducibility, and responsible interpretation.
+- The data is historical and comes from one competition setting.
+- The evaluation is a random holdout, not an out-of-time study; the holdout was inspected during earlier benchmarking.
+- No independent external validation, fairness certification, causal finding, or production monitoring system is provided.
+- Decision costs are illustrative and do not represent real lending economics or applicant utility.
+- The meaning of some missing installment observations is unspecified by the source.
+- The results do not establish legal sufficiency or production readiness.
 
 ## Conclusion
 
-The analysis provides evidence that alternative behavioural history contains incremental predictive information beyond application and bureau features, with the strongest improvement observed among borrowers with no bureau records. The result is consistent across the controlled Logistic Regression ablation and nonlinear HGB comparison. It comes from a historical random holdout and does not establish out-of-time, cross-institution, fairness, or production performance.
+The controlled comparison provides evidence that alternative behavioural history adds predictive signal beyond application and bureau information in this dataset, with the largest HGB ranking gains among applicants with no bureau records. These results do not establish performance over time, at another institution, or in production.
 
-**Project documents:** [Final results](docs/final_results.md) · [Reproducibility](docs/reproducibility.md) · [Interview summary](docs/interview_summary.md) · [Resume results](docs/resume_results.md)
+**Technical documentation:** [Results](docs/results.md) · [Methodology](docs/methodology.md) · [Feature engineering](docs/feature_engineering.md) · [Feature validation](docs/feature_validation.md) · [Data dictionary](docs/data_dictionary.md) · [Reproducibility](docs/reproducibility.md)

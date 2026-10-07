@@ -9,5 +9,4 @@ dependencies:
   - scipy
   - scikit-learn
   - matplotlib
-  - jupyter
   - pytest

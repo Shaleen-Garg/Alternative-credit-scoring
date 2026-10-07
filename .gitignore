@@ -14,9 +14,6 @@ env/
 .env.*
 !.env.example
 
-# Jupyter
-.ipynb_checkpoints/
-
 # Data
 data/raw/*
 data/interim/*
@@ -45,17 +42,14 @@ data/processed/*
 *.sqlite
 *.sqlite3
 
-# Generated outputs
-reports/figures/*
-reports/tables/*
-reports/final/*
+# Detailed generated outputs are rebuilt by the analysis modules.
+reports/figures/
+reports/tables/
 
-!reports/figures/.gitkeep
-!reports/tables/.gitkeep
-!reports/tables/phase*.csv
-!reports/tables/phase*.json
-!reports/final/*.csv
-!reports/final/*.png
+# Curated, shareable results.
+reports/results/*
+!reports/results/*.csv
+!reports/results/*.png
 
 # OS
 .DS_Store

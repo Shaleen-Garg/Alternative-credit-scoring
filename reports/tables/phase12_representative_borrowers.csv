@@ -1,5 +1,0 @@
-cohort,risk_band,selection_rule,SK_ID_CURR,predicted_PD_sigmoid
-Thin-file,High risk,median_top_decile,262556,0.2738204352289417
-Thin-file,Low risk,median_bottom_decile,116198,0.020013763488316887
-Non-thin-file,High risk,median_top_decile,449485,0.24552647505903857
-Non-thin-file,Low risk,median_bottom_decile,399990,0.013895373724398436

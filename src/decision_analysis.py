@@ -44,8 +44,8 @@ def _cohort_masks(frame):
             "Non-thin-file": ~thin}
 
 
-def run_phase11(filepath="data/processed/feature_master.csv", split_dir="data/processed/splits",
-                output_dir="reports"):
+def run_decision_analysis(filepath="data/processed/feature_master.csv", split_dir="data/processed/splits",
+                          output_dir="reports"):
     out = Path(output_dir)
     tables, figures = out / "tables", out / "figures"
     tables.mkdir(parents=True, exist_ok=True)
@@ -73,7 +73,7 @@ def run_phase11(filepath="data/processed/feature_master.csv", split_dir="data/pr
                         curve_rows.append({"split": split, "model": group, "cohort": cohort,
                                            "FN_to_FP_cost_ratio": f"{ratio}:1", **metrics})
     curves = pd.DataFrame(curve_rows)
-    curves.to_csv(tables / "phase11_threshold_curves.csv", index=False)
+    curves.to_csv(tables / "decision_threshold_curves.csv", index=False)
 
     selected_rows = []
     for ratio in COST_RATIOS:
@@ -86,7 +86,7 @@ def run_phase11(filepath="data/processed/feature_master.csv", split_dir="data/pr
                                   "FN_to_FP_cost_ratio": f"{ratio}:1", **best,
                                   "selection_data": "validation only"})
     selected = pd.DataFrame(selected_rows)
-    selected.to_csv(tables / "phase11_validation_selected_thresholds.csv", index=False)
+    selected.to_csv(tables / "selected_validation_thresholds.csv", index=False)
 
     test_rows = []
     for row in selected.itertuples(index=False):
@@ -97,7 +97,7 @@ def run_phase11(filepath="data/processed/feature_master.csv", split_dir="data/pr
                               **decision_metrics(y_test.to_numpy()[mask], predictions["test"][group][mask],
                                                  row.threshold, fn_cost=int(row.FN_to_FP_cost_ratio.split(":")[0]), fp_cost=1)})
     test_selected = pd.DataFrame(test_rows)
-    test_selected.to_csv(tables / "phase11_test_selected_thresholds.csv", index=False)
+    test_selected.to_csv(tables / "selected_test_thresholds.csv", index=False)
 
     # Select separate Model B/C validation cutoffs to target the same validation
     # approval volume, then compare the realized frozen-test trade-offs.
@@ -118,7 +118,7 @@ def run_phase11(filepath="data/processed/feature_master.csv", split_dir="data/pr
                                     "validation_approval_rate": val_metrics["approval_rate"],
                                     **{f"test_{key}": value for key, value in test_metrics.items() if key != "threshold"}})
     volume = pd.DataFrame(volume_rows)
-    volume.to_csv(tables / "phase11_same_approval_rate_comparison.csv", index=False)
+    volume.to_csv(tables / "approval_rate_comparison.csv", index=False)
 
     # Plot 1: validation cost curves, plus validation and test volume-risk curves.
     fig, axes = plt.subplots(2, 2, figsize=(12, 9))
@@ -136,7 +136,7 @@ def run_phase11(filepath="data/processed/feature_master.csv", split_dir="data/pr
         ax.plot(subset.threshold, subset[metric])
         ax.set(title=f"Validation {title} (FN:FP 2:1)", xlabel="Default-probability threshold", ylabel=title)
     fig.tight_layout()
-    fig.savefig(figures / "phase11_threshold_tradeoffs.png", dpi=160, bbox_inches="tight")
+    fig.savefig(figures / "threshold_tradeoffs.png", dpi=160, bbox_inches="tight")
     plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -150,7 +150,7 @@ def run_phase11(filepath="data/processed/feature_master.csv", split_dir="data/pr
            ylabel="Default rate among approved", xlim=(0, 1))
     ax.legend(fontsize=8)
     fig.tight_layout()
-    fig.savefig(figures / "phase11_risk_vs_approval.png", dpi=160, bbox_inches="tight")
+    fig.savefig(figures / "risk_vs_approval.png", dpi=160, bbox_inches="tight")
     plt.close(fig)
 
     return {"curves": curves, "selected_validation": selected,
@@ -158,6 +158,6 @@ def run_phase11(filepath="data/processed/feature_master.csv", split_dir="data/pr
 
 
 if __name__ == "__main__":
-    result = run_phase11()
+    result = run_decision_analysis()
     print(result["selected_validation"].to_string(index=False))
     print(result["selected_test"].to_string(index=False))

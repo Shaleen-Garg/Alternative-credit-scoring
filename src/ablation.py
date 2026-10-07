@@ -59,7 +59,7 @@ def run_ablation(filepath="data/processed/feature_master.csv", output_dir="repor
             metric_rows.append({"split": split, "model": model_name,
                                 **evaluate_model(y, predictions[split][model_name])})
     metrics = pd.DataFrame(metric_rows)
-    metrics.to_csv(tables / "phase8_split_metrics.csv", index=False)
+    metrics.to_csv(tables / "ablation_split_metrics.csv", index=False)
 
     thin = thin_file_mask(X_test).to_numpy()
     cohorts = {"Overall": np.ones(len(X_test), dtype=bool), "Thin-file": thin, "Non-thin-file": ~thin}
@@ -74,7 +74,7 @@ def run_ablation(filepath="data/processed/feature_master.csv", output_dir="repor
                 subset_rows.append({"split": split, "cohort": cohort, "model": model_name, "n": int(mask.sum()),
                                     **evaluate_model(y_split.to_numpy()[mask], predictions[split][model_name][mask])})
     subset_metrics = pd.DataFrame(subset_rows)
-    subset_metrics.to_csv(tables / "phase8_cohort_metrics.csv", index=False)
+    subset_metrics.to_csv(tables / "ablation_cohort_metrics.csv", index=False)
 
     test = metrics[metrics.split == "test"].set_index("model")
     thin_metrics = subset_metrics[(subset_metrics.split == "test") & (subset_metrics.cohort == "Thin-file")].set_index("model")
@@ -84,7 +84,7 @@ def run_ablation(filepath="data/processed/feature_master.csv", output_dir="repor
          "thin_file_roc_auc": thin_metrics.loc[m, "roc_auc"], "thin_file_pr_auc": thin_metrics.loc[m, "pr_auc"]}
         for i, m in enumerate(MODEL_KEYS)
     ])
-    summary.to_csv(tables / "phase8_ablation_summary.csv", index=False)
+    summary.to_csv(tables / "ablation_summary.csv", index=False)
 
     increments = []
     for label, first, second in [("Bureau added to Application", MODEL_KEYS[0], MODEL_KEYS[1]),
@@ -95,26 +95,26 @@ def run_ablation(filepath="data/processed/feature_master.csv", output_dir="repor
                            "relative_roc_auc_pct": 100 * (test.loc[second, "roc_auc"] - test.loc[first, "roc_auc"]) / test.loc[first, "roc_auc"],
                            "relative_pr_auc_pct": 100 * (test.loc[second, "pr_auc"] - test.loc[first, "pr_auc"]) / test.loc[first, "pr_auc"]})
     increments = pd.DataFrame(increments)
-    increments.to_csv(tables / "phase8_incremental_value.csv", index=False)
+    increments.to_csv(tables / "ablation_incremental_value.csv", index=False)
 
     predictions_test = predictions["test"]
     y_test_np = y_test.to_numpy()
-    plot_model_comparison(y_test_np, predictions_test, figures / "phase8_roc_curves.png", "roc_auc")
-    plot_model_comparison(y_test_np, predictions_test, figures / "phase8_pr_curves.png", "pr_auc")
-    plot_metric_bars(summary.rename(columns={"test_roc_auc": "roc_auc"}), "roc_auc", figures / "phase8_test_roc_auc.png")
-    plot_metric_bars(summary.rename(columns={"test_pr_auc": "pr_auc"}), "pr_auc", figures / "phase8_test_pr_auc.png")
+    plot_model_comparison(y_test_np, predictions_test, figures / "ablation_roc_curves.png", "roc_auc")
+    plot_model_comparison(y_test_np, predictions_test, figures / "ablation_pr_curves.png", "pr_auc")
+    plot_metric_bars(summary.rename(columns={"test_roc_auc": "roc_auc"}), "roc_auc", figures / "ablation_test_roc_auc.png")
+    plot_metric_bars(summary.rename(columns={"test_pr_auc": "pr_auc"}), "pr_auc", figures / "ablation_test_pr_auc.png")
     thin_frame = subset_metrics[(subset_metrics.split == "test") & (subset_metrics.cohort == "Thin-file")].rename(columns={"roc_auc": "thin_file_roc_auc", "pr_auc": "thin_file_pr_auc"})
-    plot_metric_bars(thin_frame.rename(columns={"thin_file_roc_auc": "roc_auc"}), "roc_auc", figures / "phase8_thin_file_roc_auc.png", "Thin-file test ROC-AUC")
-    plot_metric_bars(thin_frame.rename(columns={"thin_file_pr_auc": "pr_auc"}), "pr_auc", figures / "phase8_thin_file_pr_auc.png", "Thin-file test PR-AUC")
-    plot_prob_distribution(y_test_np, predictions_test[MODEL_KEYS[-1]], figures / "phase8_probability_distribution.png")
+    plot_metric_bars(thin_frame.rename(columns={"thin_file_roc_auc": "roc_auc"}), "roc_auc", figures / "thin_file_roc_auc.png", "Thin-file test ROC-AUC")
+    plot_metric_bars(thin_frame.rename(columns={"thin_file_pr_auc": "pr_auc"}), "pr_auc", figures / "thin_file_pr_auc.png", "Thin-file test PR-AUC")
+    plot_prob_distribution(y_test_np, predictions_test[MODEL_KEYS[-1]], figures / "test_probability_distribution.png")
 
     coeff = extract_coefficients(fitted[MODEL_KEYS[-1]], {
         "Application": FEATURE_GROUPS[MODEL_KEYS[0]],
         "Traditional Credit": FEATURE_GROUPS[MODEL_KEYS[1]][len(FEATURE_GROUPS[MODEL_KEYS[0]]):],
         "Alternative Behaviour": FEATURE_GROUPS[MODEL_KEYS[2]][len(FEATURE_GROUPS[MODEL_KEYS[1]]):],
     })
-    coeff.to_csv(tables / "phase8_model_c_coefficients.csv", index=False)
-    plot_coefficients(coeff, figures / "phase8_alternative_coefficients.png")
+    coeff.to_csv(tables / "logistic_model_c_coefficients.csv", index=False)
+    plot_coefficients(coeff, figures / "logistic_coefficients.png")
 
     all_features = pd.concat([X_train, X_val, X_test], ignore_index=True)
     coverage_rows = []
@@ -144,10 +144,10 @@ def run_ablation(filepath="data/processed/feature_master.csv", output_dir="repor
             coverage_rows.append({"population": population, "measure": measure, "n": count,
                                  "share": count / size if size else np.nan})
     coverage_table = pd.DataFrame(coverage_rows)
-    coverage_table.to_csv(tables / "phase8_alternative_coverage.csv", index=False)
+    coverage_table.to_csv(tables / "alternative_history_coverage.csv", index=False)
 
     alt = X_test.loc[thin, ["INST_TOTAL_COUNT", "INST_LATE_PAYMENT_COUNT", "INST_LATE_PAYMENT_RATIO", "INST_UNDERPAYMENT_COUNT"]]
-    alt.corr(method="pearson").to_csv(tables / "phase8_installment_correlations_thin_file.csv")
+    alt.corr(method="pearson").to_csv(tables / "installment_correlations_thin_file.csv")
     redundant_features = ["INST_TOTAL_COUNT", "INST_LATE_PAYMENT_COUNT",
                           "INST_LATE_PAYMENT_RATIO", "INST_UNDERPAYMENT_COUNT"]
     sensitivity_rows = []
@@ -172,7 +172,7 @@ def run_ablation(filepath="data/processed/feature_master.csv", output_dir="repor
                 row["thin_file_pr_auc"] = thin_values["pr_auc"]
                 row["delta_thin_file_pr_auc_vs_full"] = thin_values["pr_auc"] - full_thin.pr_auc
             sensitivity_rows.append(row)
-    pd.DataFrame(sensitivity_rows).to_csv(tables / "phase8_redundancy_sensitivity.csv", index=False)
+    pd.DataFrame(sensitivity_rows).to_csv(tables / "ablation_redundancy_sensitivity.csv", index=False)
     bootstrap_repetitions = 2000
     ci_overall = _bootstrap_delta(y_test_np, predictions_test[MODEL_KEYS[1]], predictions_test[MODEL_KEYS[2]], repetitions=bootstrap_repetitions)
     ci_thin = _bootstrap_delta(y_test_np[thin], predictions_test[MODEL_KEYS[1]][thin], predictions_test[MODEL_KEYS[2]][thin], repetitions=bootstrap_repetitions)
@@ -181,7 +181,7 @@ def run_ablation(filepath="data/processed/feature_master.csv", output_dir="repor
          "ci_2_5_pct": interval[0], "ci_97_5_pct": interval[1]}
         for cohort, intervals in [("Overall test", ci_overall), ("Thin-file test", ci_thin)]
         for metric, interval in intervals.items()
-    ]).to_csv(tables / "phase8_incremental_bootstrap_ci.csv", index=False)
+    ]).to_csv(tables / "ablation_bootstrap_intervals.csv", index=False)
 
     return {"splits": (X_train, X_val, X_test), "metrics": metrics, "subsets": subset_metrics,
             "summary": summary, "increments": increments, "coefficients": coeff,

@@ -1,4 +1,4 @@
-"""Build the small, curated set of final portfolio tables and figures."""
+"""Build the curated results tables and figures."""
 
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -7,31 +7,31 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 TABLES = ROOT / "reports" / "tables"
-FINAL = ROOT / "reports" / "final"
+RESULTS = ROOT / "reports" / "results"
 
 
 def run_release_assets() -> None:
-    FINAL.mkdir(parents=True, exist_ok=True)
+    RESULTS.mkdir(parents=True, exist_ok=True)
 
-    comparison = pd.read_csv(TABLES / "phase9_model_comparison.csv")
-    comparison.to_csv(FINAL / "model_comparison.csv", index=False)
+    comparison = pd.read_csv(TABLES / "model_comparison_metrics.csv")
+    comparison.to_csv(RESULTS / "model_comparison.csv", index=False)
 
-    cohort = pd.read_csv(TABLES / "phase13_cohort_performance.csv")
+    cohort = pd.read_csv(TABLES / "cohort_performance.csv")
     cohort = cohort[(cohort["split"] == "test") & cohort["model"].isin(
         ["Application + Bureau", "Application + Bureau + Alternative"]
     )]
-    cohort.to_csv(FINAL / "test_cohort_comparison.csv", index=False)
+    cohort.to_csv(RESULTS / "test_cohort_comparison.csv", index=False)
 
-    calibration = pd.read_csv(TABLES / "phase10_calibration_test_metrics.csv")
+    calibration = pd.read_csv(TABLES / "calibration_test_metrics.csv")
     calibration = calibration[calibration["method"].isin(["uncalibrated", "sigmoid"])]
-    calibration.to_csv(FINAL / "calibration_summary.csv", index=False)
+    calibration.to_csv(RESULTS / "calibration_summary.csv", index=False)
 
-    decision = pd.read_csv(TABLES / "phase11_same_approval_rate_comparison.csv")
+    decision = pd.read_csv(TABLES / "approval_rate_comparison.csv")
     decision = decision[decision["target_validation_approval_rate"] == 0.7]
-    decision.to_csv(FINAL / "decision_at_70pct_approval.csv", index=False)
+    decision.to_csv(RESULTS / "decision_at_70pct_approval.csv", index=False)
 
-    bootstrap = pd.read_csv(TABLES / "phase13_model_c_minus_b_bootstrap_ci.csv")
-    bootstrap.to_csv(FINAL / "paired_bootstrap_intervals.csv", index=False)
+    bootstrap = pd.read_csv(TABLES / "paired_bootstrap_intervals.csv")
+    bootstrap.to_csv(RESULTS / "paired_bootstrap_intervals.csv", index=False)
 
     plt.style.use("seaborn-v0_8-whitegrid")
     colors = {"Logistic Regression": "#3973ac", "HistGradientBoostingClassifier": "#e08b36"}
@@ -49,11 +49,11 @@ def run_release_assets() -> None:
         ax.set_title(title)
         ax.bar_label(bars, fmt="%.3f", padding=3, fontsize=8)
     fig.suptitle("Frozen test performance by feature group and model", fontsize=14)
-    fig.savefig(FINAL / "model_comparison.png", dpi=180)
+    fig.savefig(RESULTS / "model_comparison.png", dpi=180)
     plt.close(fig)
 
-    linear = pd.read_csv(TABLES / "phase8_ablation_summary.csv")
-    nonlinear = pd.read_csv(TABLES / "phase9_nonlinear_cohort_metrics.csv")
+    linear = pd.read_csv(TABLES / "ablation_summary.csv")
+    nonlinear = pd.read_csv(TABLES / "hgb_cohort_metrics.csv")
     linear = linear.rename(columns={"model": "feature_group", "thin_file_roc_auc": "thin_roc_auc", "thin_file_pr_auc": "thin_pr_auc"})
     nonlinear = nonlinear[(nonlinear["split"] == "test") & (nonlinear["cohort"] == "Thin-file")]
     nonlinear = nonlinear.rename(columns={"model": "feature_group", "roc_auc": "thin_roc_auc", "pr_auc": "thin_pr_auc"})
@@ -63,7 +63,7 @@ def run_release_assets() -> None:
         linear[["feature_group", "learner", "thin_roc_auc", "thin_pr_auc"]],
         nonlinear[["feature_group", "learner", "thin_roc_auc", "thin_pr_auc"]],
     ], ignore_index=True)
-    thin.to_csv(FINAL / "thin_file_model_comparison.csv", index=False)
+    thin.to_csv(RESULTS / "thin_file_model_comparison.csv", index=False)
 
     fig, axes = plt.subplots(1, 2, figsize=(11, 5.5), constrained_layout=True)
     short_names = thin["feature_group"].str.replace("Application + Bureau + Alternative", "A+B+Alt", regex=False).str.replace("Application + Bureau", "A+B", regex=False).str.replace("Application", "A", regex=False)
@@ -76,10 +76,10 @@ def run_release_assets() -> None:
         ax.set_title(title)
         ax.bar_label(bars, fmt="%.3f", padding=3, fontsize=8)
     fig.suptitle("Thin-file test performance across feature groups", fontsize=14)
-    fig.savefig(FINAL / "thin_file_comparison.png", dpi=180)
+    fig.savefig(RESULTS / "thin_file_comparison.png", dpi=180)
     plt.close(fig)
 
-    reliability = pd.read_csv(TABLES / "phase10_calibration_reliability_bins.csv")
+    reliability = pd.read_csv(TABLES / "calibration_reliability_bins.csv")
     fig, axes = plt.subplots(1, 2, figsize=(10, 4.8), constrained_layout=True)
     for ax, group in zip(axes, ["Overall", "Thin-file"]):
         rows = reliability[(reliability["cohort"] == group) & reliability["method"].isin(["uncalibrated", "sigmoid"])]
@@ -89,10 +89,10 @@ def run_release_assets() -> None:
         ax.set(xlim=(0, .6), ylim=(0, .6), xlabel="Mean predicted PD", ylabel="Observed default rate", title=group)
         ax.legend(frameon=False)
     fig.suptitle("Test-set reliability by cohort", fontsize=14)
-    fig.savefig(FINAL / "calibration_reliability.png", dpi=180)
+    fig.savefig(RESULTS / "calibration_reliability.png", dpi=180)
     plt.close(fig)
 
-    decision = pd.read_csv(FINAL / "decision_at_70pct_approval.csv")
+    decision = pd.read_csv(RESULTS / "decision_at_70pct_approval.csv")
     fig, axes = plt.subplots(1, 2, figsize=(10, 4.7), constrained_layout=True)
     for ax, group in zip(axes, ["Overall", "Thin-file"]):
         rows = decision[decision["cohort"] == group]
@@ -101,18 +101,18 @@ def run_release_assets() -> None:
         ax.set(xlim=(.65, .75), ylim=(0, .08), xlabel="Test approval rate", ylabel="Default rate among approved", title=group)
         ax.legend(frameon=False, fontsize=8)
     fig.suptitle("Illustrative operating points near 70% validation approval", fontsize=14)
-    fig.savefig(FINAL / "decision_tradeoff.png", dpi=180)
+    fig.savefig(RESULTS / "decision_tradeoff.png", dpi=180)
     plt.close(fig)
 
-    importance = pd.read_csv(TABLES / "phase12_validation_feature_importance.csv").nlargest(12, "importance_mean").sort_values("importance_mean")
+    importance = pd.read_csv(TABLES / "feature_importance.csv").nlargest(12, "importance_mean").sort_values("importance_mean")
     fig, ax = plt.subplots(figsize=(8, 5.7), constrained_layout=True)
     bars = ax.barh(importance["feature"], importance["importance_mean"], color="#3973ac")
     ax.set(xlabel="Decrease in validation average precision", title="Top validation permutation importance")
     ax.bar_label(bars, fmt="%.3f", padding=3, fontsize=8)
-    fig.savefig(FINAL / "feature_importance.png", dpi=180)
+    fig.savefig(RESULTS / "feature_importance.png", dpi=180)
     plt.close(fig)
 
-    scores = pd.read_csv(TABLES / "phase13_prediction_stability.csv")
+    scores = pd.read_csv(TABLES / "prediction_stability.csv")
     fig, ax = plt.subplots(figsize=(7, 4.8), constrained_layout=True)
     for cohort_name, rows in scores.groupby("cohort"):
         rows = rows.set_index("split").reindex(["train", "validation", "test"])
@@ -120,7 +120,7 @@ def run_release_assets() -> None:
     ax.set(ylabel="Mean predicted PD", title="Mean score by split and cohort")
     ax.legend(frameon=False)
     ax.text(.01, -.23, "Training scores are in-sample; held-out splits are validation and test.", transform=ax.transAxes, fontsize=8)
-    fig.savefig(FINAL / "prediction_stability.png", dpi=180, bbox_inches="tight")
+    fig.savefig(RESULTS / "prediction_stability.png", dpi=180, bbox_inches="tight")
     plt.close(fig)
 
 

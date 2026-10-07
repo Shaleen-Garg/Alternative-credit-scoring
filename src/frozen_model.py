@@ -1,4 +1,4 @@
-"""Reconstruct the frozen Phase 10 model and validation-fitted calibrator."""
+"""Reconstruct the selected model and validation-fitted calibrator."""
 
 import json
 from pathlib import Path
@@ -10,9 +10,9 @@ from src.nonlinear import _new_model, _tree_features
 
 def fit_hgb_with_validation_sigmoid(feature_group, X_train, y_train, X_val, y_val,
                                     reports_dir="reports"):
-    """Fit the Phase 9 HGB parameters on train and sigmoid mapping on validation."""
+    """Fit selected HGB parameters on train and the sigmoid mapping on validation."""
     features = FEATURE_GROUPS[feature_group]
-    param_path = Path(reports_dir) / "tables" / "phase9_selected_parameters.json"
+    param_path = Path(reports_dir) / "tables" / "hgb_parameters.json"
     params = json.loads(param_path.read_text(encoding="utf-8"))["parameters"]
     model = _new_model(params)
     train = _tree_features(X_train, features)

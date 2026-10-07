@@ -32,7 +32,7 @@ class TestSplitArtifactValidation(unittest.TestCase):
             with self.assertRaises(ValueError):
                 load_split_ids([1, 2, 3, 4], folder)
 
-    def test_committed_phase8_artifacts_match_full_population(self):
+    def test_committed_split_artifacts_match_full_population(self):
         data_path = Path("data/processed/feature_master.csv")
         split_path = Path("data/processed/splits")
         if not data_path.exists() or not split_path.exists():

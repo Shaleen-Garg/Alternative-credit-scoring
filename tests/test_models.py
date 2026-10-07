@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 
 from src.models import (
     APPLICATION_FEATURES, BUREAU_FEATURES, ALTERNATIVE_FEATURES,
-    FEATURE_GROUPS, load_and_split_data, build_pipeline, create_phase7a_split_artifacts,
+    FEATURE_GROUPS, load_and_split_data, build_pipeline, create_frozen_split_artifacts,
     thin_file_mask,
 )
 
@@ -50,7 +50,7 @@ class TestFeatureGroupsAndModels(unittest.TestCase):
             path = Path(tmp) / "features.csv"
             split_dir = Path(tmp) / "splits"
             frame.to_csv(path, index=False)
-            split_ids = create_phase7a_split_artifacts(path, split_dir)
+            split_ids = create_frozen_split_artifacts(path, split_dir)
             result = load_and_split_data(path, split_dir)
         self.assertEqual([len(split_ids[k]) for k in ("train", "validation", "test")], [420, 90, 90])
         self.assertEqual(len(set(split_ids["train"]) & set(split_ids["validation"])), 0)

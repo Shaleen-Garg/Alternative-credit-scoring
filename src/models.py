@@ -46,8 +46,8 @@ def thin_file_mask(frame):
     return frame[THIN_FILE_COLUMN].eq(THIN_FILE_VALUE)
 
 
-def create_phase7a_split_artifacts(filepath, output_dir=SPLIT_DIR):
-    """Create ID files once using the original two-stage Phase 7A split recipe."""
+def create_frozen_split_artifacts(filepath, output_dir=SPLIT_DIR):
+    """Create borrower ID files using the project's stratified split procedure."""
     df = pd.read_csv(filepath)
     if "SK_ID_CURR" not in df or "TARGET" not in df:
         raise ValueError("Split generation requires SK_ID_CURR and TARGET")
@@ -94,7 +94,7 @@ def load_split_ids(population_ids, split_dir=SPLIT_DIR):
 
 
 def load_and_split_data(filepath, split_dir=SPLIT_DIR):
-    """Load model data in the persisted Phase 7A borrower-ID split order."""
+    """Load model data in the persisted borrower-ID split order."""
     df = pd.read_csv(filepath)
     required = ["SK_ID_CURR", "TARGET", *APPLICATION_FEATURES, *BUREAU_FEATURES, *ALTERNATIVE_FEATURES]
     missing = sorted(set(required) - set(df.columns))
@@ -110,7 +110,7 @@ def load_and_split_data(filepath, split_dir=SPLIT_DIR):
         X_parts.append(part[["SK_ID_CURR", *APPLICATION_FEATURES, *BUREAU_FEATURES, *ALTERNATIVE_FEATURES]].copy())
         y_parts.append(part["TARGET"].copy())
     if len(df) == 307511 and [len(x) for x in X_parts] != [215257, 46127, 46127]:
-        raise ValueError("Persisted split sizes do not match the verified Phase 8 population")
+        raise ValueError("Persisted split sizes do not match the verified modeling population")
     return (*X_parts, *y_parts)
 
 
@@ -160,7 +160,7 @@ class DaysEmployedAnomalyHandler(BaseEstimator, TransformerMixin):
         return X
 
 def build_baseline_pipeline():
-    """Backward-compatible Phase 7A constructor."""
+    """Build the established logistic baseline pipeline."""
     return build_pipeline(APPLICATION_FEATURES)
 
 

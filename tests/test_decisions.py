@@ -2,8 +2,8 @@ import unittest
 
 import numpy as np
 
-from src.phase11 import decision_metrics
-from src.phase13 import _psi
+from src.decision_analysis import decision_metrics
+from src.stability_analysis import _psi
 
 
 class TestDecisionAndStabilityDiagnostics(unittest.TestCase):

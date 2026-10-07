@@ -8,7 +8,7 @@ from sklearn.metrics import average_precision_score, roc_auc_score
 
 from src.calibration import apply_calibrator, calibration_metrics, fit_calibrator
 from src.models import FEATURE_GROUPS
-from src.phase10 import select_model_for_calibration
+from src.calibration_analysis import select_model_for_calibration
 
 
 class TestCalibration(unittest.TestCase):
@@ -47,7 +47,7 @@ class TestCalibration(unittest.TestCase):
         self.assertIn("ece_equal_width", metrics)
         self.assertEqual(int(bins.n.sum()), len(y))
 
-    def test_phase10_model_selection_is_invariant_to_test_metrics(self):
+    def test_model_selection_is_invariant_to_test_metrics(self):
         with tempfile.TemporaryDirectory() as tmp:
             tables = Path(tmp) / "tables"
             tables.mkdir()
@@ -62,10 +62,10 @@ class TestCalibration(unittest.TestCase):
                                "roc_auc": value, "pr_auc": value / 3}
                         split_rows.append(row)
                         cohort_rows.append({"split": split, "cohort": "Thin-file", **row})
-                pd.DataFrame(split_rows).to_csv(tables / "phase8_split_metrics.csv", index=False)
-                pd.DataFrame(split_rows).to_csv(tables / "phase9_nonlinear_metrics.csv", index=False)
-                pd.DataFrame(cohort_rows).to_csv(tables / "phase8_cohort_metrics.csv", index=False)
-                pd.DataFrame(cohort_rows).to_csv(tables / "phase9_nonlinear_cohort_metrics.csv", index=False)
+                pd.DataFrame(split_rows).to_csv(tables / "ablation_split_metrics.csv", index=False)
+                pd.DataFrame(split_rows).to_csv(tables / "hgb_split_metrics.csv", index=False)
+                pd.DataFrame(cohort_rows).to_csv(tables / "ablation_cohort_metrics.csv", index=False)
+                pd.DataFrame(cohort_rows).to_csv(tables / "hgb_cohort_metrics.csv", index=False)
 
             write_metrics(.999)
             first = select_model_for_calibration(tmp)

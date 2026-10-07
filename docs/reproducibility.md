@@ -1,39 +1,40 @@
-# Reproduce the analysis
+# Reproducibility
 
-## Data and environment
+## Requirements and data
 
-Use Python 3.10 or later and install the pinned project dependencies:
+Use Python 3.10 and install dependencies from requirements.txt:
 
-```text
+~~~bash
 python -m pip install -r requirements.txt
-```
+~~~
 
-Place the required Home Credit CSVs in `data/raw/` as described in [data setup](../data/README.md). The raw files, generated SQLite database, and feature table are local-only. The checked-in train, validation, and test ID files in `data/processed/splits/` define the frozen split. Do not regenerate or edit these IDs.
+The Home Credit source dataset is not included. Place the supplied CSVs in data/raw/ as listed in ../data/README.md. The current feature build requires application_train.csv, bureau.csv, previous_application.csv, and installments_payments.csv; it does not consume every table in the competition dataset.
 
-## Full reproduction sequence
+The train, validation, and test borrower IDs in data/processed/splits/ are committed and define the fixed split. Do not regenerate or edit them.
 
-Run from the repository root, in order:
+## Run the analysis
 
-```text
+From the repository root, execute the commands in order:
+
+~~~bash
 python -m src.features
+python -m src.ablation
 python -m src.nonlinear
-python -m src.phase10
-python -m src.phase11
-python -m src.phase12
-python -m src.phase13
+python -m src.calibration_analysis
+python -m src.decision_analysis
+python -m src.explainability
+python -m src.stability_analysis
 python -m src.release
 python -m pytest -q
-```
+~~~
 
-`src.features` rebuilds the SQLite database and feature table. Phase 9 selects the small HGB candidate set using validation PR-AUC and writes the selected parameters. Phase 10 selects a predictive model and calibration mapping using training and validation only. Phases 11–13 reconstruct the selected model; Phase 11 chooses cost and approval-volume thresholds on validation, Phase 12 explains the same Model C, and Phase 13 computes descriptive cohort and stability diagnostics. None of these stages changes the frozen split IDs. `src.release` assembles the compact outputs under `reports/final/` from the phase tables.
+The feature builder creates the local SQLite database and applicant-level table. The analysis modules run the controlled feature comparison, nonlinear comparison, calibration, decision, explanation, and stability analyses. The release module assembles the curated tables and figures in reports/results/. The full test suite last passed with 26 tests.
 
-On 8 October 2026, the final requested test run completed with **26 passed**. The Phase 10 reconciliation audit records matching Phase 9/10 uncalibrated test metrics, ordered split fingerprints, and that test labels were not used in selection or fitting. Runtime and hardware may affect elapsed time, but the seeded analysis and outputs are reproducible for the same source data and dependencies.
+## Generated and committed files
 
-## Generated outputs
+- data/interim/project.db and data/processed/feature_master.csv are generated locally and ignored by Git.
+- Detailed run tables and intermediate figures are generated under reports/tables/ and reports/figures/ and ignored by Git.
+- Curated summary tables and figures are stored under reports/results/.
+- Frozen split IDs are committed so the borrower assignments remain consistent.
 
-- `data/interim/project.db`: rebuilt local SQLite database.
-- `data/processed/feature_master.csv`: borrower-level modeling table.
-- `reports/tables/phase*.csv` and `.json`: phase-level evaluation and audit records.
-- `reports/final/`: curated portfolio tables and figures.
-
-Raw data, database files, and processed features are ignored by Git. Never commit them. The repository does commit frozen split IDs so the evaluated borrowers remain consistent.
+Runtime and numerical details may vary across machines and library builds; bit-for-bit output is not guaranteed.

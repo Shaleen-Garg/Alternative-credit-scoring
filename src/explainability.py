@@ -50,8 +50,8 @@ def _reason(feature, sign):
     return f"{label} {direction} this borrower's model PD relative to replacing it with the training median."
 
 
-def run_phase12(filepath="data/processed/feature_master.csv", split_dir="data/processed/splits",
-                output_dir="reports"):
+def run_explainability_analysis(filepath="data/processed/feature_master.csv", split_dir="data/processed/splits",
+                                output_dir="reports"):
     out = Path(output_dir)
     tables, figures = out / "tables", out / "figures"
     tables.mkdir(parents=True, exist_ok=True)
@@ -84,14 +84,14 @@ def run_phase12(filepath="data/processed/feature_master.csv", split_dir="data/pr
                            "validation_ROC_AUC_drop_std": np.std(drops_auc, ddof=1),
                            "permutations": 3})
     group_importance = pd.DataFrame(group_rows).sort_values("validation_AP_drop_mean", ascending=False)
-    group_importance.to_csv(tables / "phase12_group_permutation_importance.csv", index=False)
+    group_importance.to_csv(tables / "group_feature_importance.csv", index=False)
 
-    individual = pd.read_csv(tables / "phase9_validation_permutation_importance.csv")
+    individual = pd.read_csv(tables / "validation_permutation_importance.csv")
     individual["feature_group"] = individual.feature.map(_feature_group)
-    individual.to_csv(tables / "phase12_validation_feature_importance.csv", index=False)
+    individual.to_csv(tables / "feature_importance.csv", index=False)
     alternative = individual[individual.feature_group == "Alternative Behaviour"].sort_values(
         "importance_mean", ascending=False)
-    alternative.to_csv(tables / "phase12_alternative_feature_importance.csv", index=False)
+    alternative.to_csv(tables / "alternative_feature_importance.csv", index=False)
 
     # Select the median-risk case inside each cohort's top/bottom decile. The
     # rule uses predicted risk and cohort only; it does not inspect outcomes.
@@ -113,7 +113,7 @@ def run_phase12(filepath="data/processed/feature_master.csv", split_dir="data/pr
                                  "predicted_PD_sigmoid": float(p_test[selected])})
     examples = pd.DataFrame(example_rows)
     examples.drop(columns="row_index").to_csv(
-        tables / "phase12_representative_borrowers.csv", index=False)
+        tables / "representative_borrowers.csv", index=False)
 
     train_transformed = _tree_features(X_train, features)
     reference = train_transformed.median(axis=0, skipna=True)
@@ -135,19 +135,19 @@ def run_phase12(filepath="data/processed/feature_master.csv", split_dir="data/pr
                                "direction": "raises risk vs median" if delta > 0 else "lowers risk vs median",
                                "reason_code": _reason(feature, delta)})
     local = pd.DataFrame(local_rows)
-    local.to_csv(tables / "phase12_local_feature_replacements.csv", index=False)
+    local.to_csv(tables / "local_feature_replacements.csv", index=False)
     top_local = pd.concat([
         local.sort_values("PD_change_vs_median_replacement").groupby("SK_ID_CURR").head(5),
         local.sort_values("PD_change_vs_median_replacement", ascending=False).groupby("SK_ID_CURR").head(5),
     ]).drop_duplicates(["SK_ID_CURR", "feature"])
-    top_local.to_csv(tables / "phase12_reason_codes.csv", index=False)
+    top_local.to_csv(tables / "local_reason_codes.csv", index=False)
 
     top = individual.sort_values("importance_mean", ascending=False).head(12).sort_values("importance_mean")
     fig, ax = plt.subplots(figsize=(8, 6))
     ax.barh(top.feature, top.importance_mean, xerr=top.importance_std, color="#4C78A8")
     ax.set(title="Model C validation permutation importance", xlabel="Average-precision decrease")
     fig.tight_layout()
-    fig.savefig(figures / "phase12_global_feature_importance.png", dpi=160, bbox_inches="tight")
+    fig.savefig(figures / "global_feature_importance.png", dpi=160, bbox_inches="tight")
     plt.close(fig)
     fig, ax = plt.subplots(figsize=(7, 4.5))
     ax.bar(group_importance.feature_group, group_importance.validation_AP_drop_mean,
@@ -155,13 +155,13 @@ def run_phase12(filepath="data/processed/feature_master.csv", split_dir="data/pr
     ax.set(title="Joint feature-group permutation on validation", ylabel="Average-precision decrease")
     ax.tick_params(axis="x", rotation=15)
     fig.tight_layout()
-    fig.savefig(figures / "phase12_group_importance.png", dpi=160, bbox_inches="tight")
+    fig.savefig(figures / "group_importance.png", dpi=160, bbox_inches="tight")
     plt.close(fig)
     return {"group_importance": group_importance, "individual_importance": individual,
             "alternative_importance": alternative, "examples": examples, "local_effects": local}
 
 
 if __name__ == "__main__":
-    result = run_phase12()
+    result = run_explainability_analysis()
     print(result["group_importance"].to_string(index=False))
     print(result["examples"].to_string(index=False))

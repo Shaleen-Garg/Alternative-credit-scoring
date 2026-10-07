@@ -1,4 +1,4 @@
-"""Select a frozen Phase 9 model on validation, calibrate, and evaluate once on test."""
+"""Select a frozen boosting model on validation, calibrate, and evaluate on the holdout."""
 
 import json
 import hashlib
@@ -20,10 +20,10 @@ from src.nonlinear import _new_model, _tree_features
 def select_model_for_calibration(reports_dir="reports"):
     """Select from train/validation only using overall/thin ranking, gap, and complexity."""
     tables = Path(reports_dir) / "tables"
-    linear = pd.read_csv(tables / "phase8_split_metrics.csv")
-    nonlinear = pd.read_csv(tables / "phase9_nonlinear_metrics.csv")
-    cohort_linear = pd.read_csv(tables / "phase8_cohort_metrics.csv")
-    cohort_nonlinear = pd.read_csv(tables / "phase9_nonlinear_cohort_metrics.csv")
+    linear = pd.read_csv(tables / "ablation_split_metrics.csv")
+    nonlinear = pd.read_csv(tables / "hgb_split_metrics.csv")
+    cohort_linear = pd.read_csv(tables / "ablation_cohort_metrics.csv")
+    cohort_nonlinear = pd.read_csv(tables / "hgb_cohort_metrics.csv")
     # Remove test rows before any model ranking calculations; they are not
     # inputs to selection, even indirectly.
     linear = linear[linear.split.isin(["train", "validation"])]
@@ -73,15 +73,15 @@ def _draw_reliability(bins, cohort, path):
     plt.close(fig)
 
 
-def run_phase10(filepath="data/processed/feature_master.csv",
-                split_dir="data/processed/splits", output_dir="reports"):
+def run_calibration_analysis(filepath="data/processed/feature_master.csv",
+                             split_dir="data/processed/splits", output_dir="reports"):
     out = Path(output_dir)
     tables, figures = out / "tables", out / "figures"
     tables.mkdir(parents=True, exist_ok=True)
     figures.mkdir(parents=True, exist_ok=True)
 
     selection = select_model_for_calibration(output_dir)
-    selection.to_csv(tables / "phase10_model_selection.csv", index=False)
+    selection.to_csv(tables / "candidate_model_validation_metrics.csv", index=False)
     chosen = selection.iloc[0]
     model_type, model_name = chosen.model_type, chosen.model
     features = FEATURE_GROUPS[model_name]
@@ -89,10 +89,10 @@ def run_phase10(filepath="data/processed/feature_master.csv",
     if model_type == "Logistic Regression":
         base_model = build_pipeline(features)
     else:
-        params = json.loads((tables / "phase9_selected_parameters.json").read_text(encoding="utf-8"))["parameters"]
+        params = json.loads((tables / "hgb_parameters.json").read_text(encoding="utf-8"))["parameters"]
         base_model = _new_model(params)
     if model_type == "HistGradientBoostingClassifier":
-        # Match Phase 9 exactly: convert the employment sentinel to NaN before
+        # Use the same tree preprocessing: convert the employment sentinel to NaN before
         # both model fitting and prediction. HGB handles the resulting missing
         # values natively; passing the raw sentinel changes the fitted trees.
         train_features = _tree_features(X_train, features)
@@ -126,7 +126,7 @@ def run_phase10(filepath="data/processed/feature_master.csv",
     ).reset_index(drop=True)
     selected_method = method_selection.iloc[0].method
     method_selection["selected"] = method_selection.method.eq(selected_method)
-    method_selection.to_csv(tables / "phase10_calibration_validation_selection.csv", index=False)
+    method_selection.to_csv(tables / "calibration_validation_selection.csv", index=False)
 
     # Refit only the chosen mapping on all validation predictions, never on test labels.
     if selected_method != "uncalibrated":
@@ -151,11 +151,11 @@ def run_phase10(filepath="data/processed/feature_master.csv",
             bins["cohort"], bins["method"] = cohort, method
             bin_frames.append(bins)
     test_metrics = pd.DataFrame(test_rows)
-    test_metrics.to_csv(tables / "phase10_calibration_test_metrics.csv", index=False)
+    test_metrics.to_csv(tables / "calibration_test_metrics.csv", index=False)
     bins = pd.concat(bin_frames, ignore_index=True)
-    bins.to_csv(tables / "phase10_calibration_reliability_bins.csv", index=False)
-    _draw_reliability(bins, "Overall", figures / "phase10_reliability_overall.png")
-    _draw_reliability(bins, "Thin-file", figures / "phase10_reliability_thin_file.png")
+    bins.to_csv(tables / "calibration_reliability_bins.csv", index=False)
+    _draw_reliability(bins, "Overall", figures / "reliability_overall.png")
+    _draw_reliability(bins, "Thin-file", figures / "reliability_thin_file.png")
 
     record = {
         "selected_model_type": model_type,
@@ -165,21 +165,21 @@ def run_phase10(filepath="data/processed/feature_master.csv",
         "calibration_method": selected_method,
         "calibrator_fit_data": "validation predictions and labels only",
         "calibration_method_selection": "held-out half of validation (stratified), minimizing log loss then Brier",
-        "base_model_fit_data": "training split only; reconstructed with Phase 9 parameters and preprocessing",
-        "base_model_preprocessing": "Phase 9 _tree_features: employment sentinel 365243 converted to NaN; native HGB missing-value handling",
+        "base_model_fit_data": "training split only; reconstructed with selected boosting parameters and preprocessing",
+        "base_model_preprocessing": "Tree preprocessing: employment sentinel 365243 converted to NaN; native HGB missing-value handling",
         "test_used_for_model_or_calibrator_fit": False,
         "test_labels_used_for_model_selection_calibration_or_threshold_selection": False,
     }
-    (tables / "phase10_selected_model.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
+    (tables / "selected_model.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
     if model_type == "HistGradientBoostingClassifier":
         def ids_digest(frame):
             payload = ",".join(map(str, frame.SK_ID_CURR.tolist())).encode("utf-8")
             return hashlib.sha256(payload).hexdigest()
         with open(filepath, "rb") as data_file:
             feature_table_sha256 = hashlib.sha256(data_file.read()).hexdigest()
-        phase9_metrics = pd.read_csv(tables / "phase9_nonlinear_metrics.csv")
-        phase9_c = phase9_metrics[(phase9_metrics.split == "test") &
-                                  (phase9_metrics.model == model_name)].iloc[0]
+        hgb_metrics = pd.read_csv(tables / "hgb_split_metrics.csv")
+        hgb_model_c = hgb_metrics[(hgb_metrics.split == "test") &
+                                  (hgb_metrics.model == model_name)].iloc[0]
         raw_test = evaluate_model(y_test, p_test)
         reconciliation = {
             "feature_table": filepath,
@@ -192,21 +192,21 @@ def run_phase10(filepath="data/processed/feature_master.csv",
                     pd.read_csv(Path(split_dir) / "test_ids.csv").SK_ID_CURR.tolist(),
             },
             "feature_columns_in_order": features,
-            "missing_value_handling": "Phase 9 _tree_features; native HGB NaN handling",
+            "missing_value_handling": "Tree preprocessing; native HGB missing-value handling",
             "employment_sentinel": "APP_DAYS_EMPLOYED 365243 -> NaN before fit and prediction",
-            "model_parameters": json.loads((tables / "phase9_selected_parameters.json").read_text(encoding="utf-8")),
+            "model_parameters": json.loads((tables / "hgb_parameters.json").read_text(encoding="utf-8")),
             "fit_rows": "training split only; train+validation not used",
             "target_extraction": "TARGET aligned by explicit split IDs and their persisted row order",
-            "phase9_test_roc_auc": float(phase9_c.roc_auc),
-            "phase9_test_pr_auc": float(phase9_c.pr_auc),
-            "phase10_uncalibrated_test_roc_auc": raw_test["roc_auc"],
-            "phase10_uncalibrated_test_pr_auc": raw_test["pr_auc"],
-            "test_metrics_match_phase9": bool(
-                np.isclose(raw_test["roc_auc"], phase9_c.roc_auc, atol=1e-12) and
-                np.isclose(raw_test["pr_auc"], phase9_c.pr_auc, atol=1e-12)),
+            "hgb_test_roc_auc": float(hgb_model_c.roc_auc),
+            "hgb_test_pr_auc": float(hgb_model_c.pr_auc),
+            "uncalibrated_test_roc_auc": raw_test["roc_auc"],
+            "uncalibrated_test_pr_auc": raw_test["pr_auc"],
+            "uncalibrated_metrics_match_hgb": bool(
+                np.isclose(raw_test["roc_auc"], hgb_model_c.roc_auc, atol=1e-12) and
+                np.isclose(raw_test["pr_auc"], hgb_model_c.pr_auc, atol=1e-12)),
             "test_labels_used_for_any_selection_or_fit": False,
         }
-        (tables / "phase10_reconciliation_audit.json").write_text(
+        (tables / "model_reconciliation.json").write_text(
             json.dumps(reconciliation, indent=2), encoding="utf-8")
     return {"selection": selection, "calibration_selection": method_selection,
             "test_metrics": test_metrics, "reliability_bins": bins,
@@ -214,7 +214,7 @@ def run_phase10(filepath="data/processed/feature_master.csv",
 
 
 if __name__ == "__main__":
-    result = run_phase10()
+    result = run_calibration_analysis()
     print(json.dumps(result["selected_model"], indent=2))
     print(result["calibration_selection"].to_string(index=False))
     print(result["test_metrics"].to_string(index=False))

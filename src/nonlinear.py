@@ -40,8 +40,8 @@ def _new_model(params):
     )
 
 
-def run_phase9(filepath="data/processed/feature_master.csv",
-               split_dir="data/processed/splits", output_dir="reports"):
+def run_nonlinear_comparison(filepath="data/processed/feature_master.csv",
+                             split_dir="data/processed/splits", output_dir="reports"):
     run_started = time.perf_counter()
     X_train, X_val, X_test, y_train, y_val, y_test = load_and_split_data(filepath, split_dir)
     split_x = {"train": X_train, "validation": X_val, "test": X_test}
@@ -72,8 +72,8 @@ def run_phase9(filepath="data/processed/feature_master.csv",
     tables, figures = out / "tables", out / "figures"
     tables.mkdir(parents=True, exist_ok=True)
     figures.mkdir(parents=True, exist_ok=True)
-    candidates.to_csv(tables / "phase9_validation_candidates.csv", index=False)
-    (tables / "phase9_selected_parameters.json").write_text(
+    candidates.to_csv(tables / "hgb_candidate_validation_metrics.csv", index=False)
+    (tables / "hgb_parameters.json").write_text(
         json.dumps({"model": "HistGradientBoostingClassifier", "parameters": selected_params,
                     "selected_on": "Model C validation PR-AUC, ROC-AUC tie-break",
                     "random_state": 42, "early_stopping": False}, indent=2), encoding="utf-8"
@@ -105,7 +105,7 @@ def run_phase9(filepath="data/processed/feature_master.csv",
             metric_rows.append({"split": split, "model": model_name,
                                 **evaluate_model(split_y[split], predictions[split][model_name])})
     metrics = pd.DataFrame(metric_rows)
-    metrics.to_csv(tables / "phase9_nonlinear_metrics.csv", index=False)
+    metrics.to_csv(tables / "hgb_split_metrics.csv", index=False)
 
     cohort_rows = []
     for split in ("validation", "test"):
@@ -118,17 +118,17 @@ def run_phase9(filepath="data/processed/feature_master.csv",
                                     "n": int(mask.sum()), **evaluate_model(
                                         target.to_numpy()[mask], predictions[split][model_name][mask])})
     cohorts = pd.DataFrame(cohort_rows)
-    cohorts.to_csv(tables / "phase9_nonlinear_cohort_metrics.csv", index=False)
+    cohorts.to_csv(tables / "hgb_cohort_metrics.csv", index=False)
 
     # Freeze the linear benchmark into the joint comparison; do not refit it here.
-    linear = pd.read_csv(tables / "phase8_split_metrics.csv") if (tables / "phase8_split_metrics.csv").exists() else None
+    linear = pd.read_csv(tables / "ablation_split_metrics.csv") if (tables / "ablation_split_metrics.csv").exists() else None
     if linear is not None:
         linear_test = linear[linear.split.isin(["validation", "test"])].copy()
         linear_test["model_type"] = "Logistic Regression"
         nonlinear_vt = metrics[metrics.split.isin(["validation", "test"])].copy()
         nonlinear_vt["model_type"] = "HistGradientBoostingClassifier"
         combined = pd.concat([linear_test, nonlinear_vt], ignore_index=True)
-        combined.to_csv(tables / "phase9_linear_nonlinear_metrics.csv", index=False)
+        combined.to_csv(tables / "learner_comparison_metrics.csv", index=False)
         validation_test = combined.pivot(index=["model", "model_type"], columns="split", values=["roc_auc", "pr_auc"])
         comparison = pd.DataFrame({
             "model": [index[0] for index in validation_test.index],
@@ -138,7 +138,7 @@ def run_phase9(filepath="data/processed/feature_master.csv",
             "validation_pr_auc": validation_test[("pr_auc", "validation")].to_numpy(),
             "test_pr_auc": validation_test[("pr_auc", "test")].to_numpy(),
         })
-        comparison.to_csv(tables / "phase9_model_comparison.csv", index=False)
+        comparison.to_csv(tables / "model_comparison_metrics.csv", index=False)
         delta_rows = []
         for group, first, second in [("Bureau addition", "Application", "Application + Bureau"),
                                      ("Alternative addition", "Application + Bureau", "Application + Bureau + Alternative")]:
@@ -150,20 +150,20 @@ def run_phase9(filepath="data/processed/feature_master.csv",
                     val_b = combined[(combined.model == second) & (combined.model_type == model_type) & (combined.split == "test")][metric].iloc[0]
                     row[f"{prefix}_delta_{metric}"] = val_b - val_a
             delta_rows.append(row)
-        pd.DataFrame(delta_rows).to_csv(tables / "phase9_incremental_comparison.csv", index=False)
+        pd.DataFrame(delta_rows).to_csv(tables / "hgb_incremental_comparison.csv", index=False)
 
-    runtime_rows.append({"model": "Full Phase 9 run", "model_type": "including validation search, fits, metrics, importance, and plots",
+    runtime_rows.append({"model": "Full nonlinear comparison", "model_type": "including validation search, fits, metrics, importance, and plots",
                          "fit_seconds": time.perf_counter() - run_started, "feature_count": len(model_c_features),
                          **selected_params})
-    pd.DataFrame(runtime_rows).to_csv(tables / "phase9_runtime.csv", index=False)
+    pd.DataFrame(runtime_rows).to_csv(tables / "hgb_runtime.csv", index=False)
     comparison_predictions = {}
     for model_name in FEATURE_GROUPS:
         comparison_predictions[f"Logistic {model_name}"] = linear_predictions["test"][model_name]
         comparison_predictions[f"Nonlinear {model_name}"] = predictions["test"][model_name]
     plot_model_comparison(y_test.to_numpy(), comparison_predictions,
-                          figures / "phase9_logistic_vs_nonlinear_roc.png", "roc_auc")
+                          figures / "model_comparison_roc.png", "roc_auc")
     plot_model_comparison(y_test.to_numpy(), comparison_predictions,
-                          figures / "phase9_logistic_vs_nonlinear_pr.png", "pr_auc")
+                          figures / "model_comparison_pr.png", "pr_auc")
 
     model_c = fitted["Application + Bureau + Alternative"]
     perm = permutation_importance(
@@ -181,14 +181,14 @@ def run_phase9(filepath="data/processed/feature_master.csv",
         feature: "Alternative / non-bureau behaviour" for feature in FEATURE_GROUPS["Application + Bureau + Alternative"][len(FEATURE_GROUPS["Application + Bureau"]):]
     })
     importance.sort_values("importance_mean", ascending=False).to_csv(
-        tables / "phase9_validation_permutation_importance.csv", index=False
+        tables / "validation_permutation_importance.csv", index=False
     )
     top = importance.sort_values("importance_mean").tail(20)
     fig, ax = plt.subplots(figsize=(8, 7))
     ax.barh(top.feature, top.importance_mean, xerr=top.importance_std, color="#4C78A8")
     ax.set(xlabel="Decrease in validation average precision after permutation",
            title="Model C validation permutation importance")
-    fig.savefig(figures / "phase9_validation_feature_importance.png", dpi=160, bbox_inches="tight")
+    fig.savefig(figures / "validation_feature_importance.png", dpi=160, bbox_inches="tight")
     plt.close(fig)
 
     # Two-way partial dependence uses validation features only and is diagnostic, not causal.
@@ -203,7 +203,7 @@ def run_phase9(filepath="data/processed/feature_master.csv",
         )
         ax.set_title(f"Validation partial dependence: {pair[0]} × {pair[1]}")
     fig.tight_layout()
-    fig.savefig(figures / "phase9_validation_interaction_diagnostics.png", dpi=160, bbox_inches="tight")
+    fig.savefig(figures / "validation_interaction_diagnostics.png", dpi=160, bbox_inches="tight")
     plt.close(fig)
 
     return {"candidate_metrics": candidates, "selected_params": selected_params,
@@ -213,6 +213,6 @@ def run_phase9(filepath="data/processed/feature_master.csv",
 
 
 if __name__ == "__main__":
-    result = run_phase9()
+    result = run_nonlinear_comparison()
     print("Selected parameters:", result["selected_params"])
     print(result["metrics"].to_string(index=False))
