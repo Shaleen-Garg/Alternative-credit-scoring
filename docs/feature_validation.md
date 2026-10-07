@@ -9,7 +9,7 @@ This document details the quality and distributional findings from the engineere
   - `APP_EXT_SOURCE_1` is missing 56.3% of values.
   - `APP_EXT_SOURCE_3` is missing 19.8% of values.
   - `APP_ANNUITY` has negligible missingness (12 rows).
-  - All engineered features default to 0 gracefully for borrowers lacking history in the respective tables.
+  - Count and amount aggregates default to 0 for borrowers with no rows in the source table. The bureau debt ratio is now kept missing when undefined for a borrower who does have bureau rows and is imputed inside the training pipeline.
 
 ## 2. Feature-Level Anomalies & Findings
 - **Constant features**: None.
@@ -29,7 +29,7 @@ This document details the quality and distributional findings from the engineere
 ## 4. Thin-File Specific Findings
 - **Size**: 44,020 borrowers (`BUREAU_CREDIT_COUNT = 0`).
 - **Default Rate**: 10.12% (Thin-file) vs 7.73% (Non-thin-file). Thin-file borrowers represent elevated credit risk.
-- **Alternative Data Coverage**: Of the 44,020 thin-file borrowers, 41,550 (94.4%) have usable alternative behavioral history, providing sufficient coverage to test whether alternative behavioral features improve risk prediction within the thin-file population. (Note: Coverage does not establish predictive improvement; the upcoming ablation study will test that).
+- **Alternative Data Coverage**: Recomputed for Phase 8: 41,550/44,020 (94.39%) have previous-application history; 41,640/44,020 (94.59%) have installment history; 41,780/44,020 (94.91%) have either. The historical 94.4% figure refers to previous-application history alone. Coverage does not itself establish predictive improvement; see `phase8_ablation.md` for the controlled comparison.
 
 ## 5. Feature Groups Summary
 | Group | Number of features | Missingness | Main purpose |
@@ -41,7 +41,7 @@ This document details the quality and distributional findings from the engineere
 ## 6. History Absence vs Zero Behavior
 The zero-imputation strategy creates a structural ambiguity where `0` can mean either "No historical records exist" or "Historical records exist, but the adverse event count is zero (clean history)".
 - **Evidence**: `INST_LATE_PAYMENT_COUNT` has 152,512 zeros. However, 136,644 of these occur where `INST_TOTAL_COUNT > 0`. Thus, 136,644 represent a perfectly clean payment history, while 15,868 represent a complete lack of installment history.
-- **Decision**: During the modeling phase, we must decide whether to introduce explicit history-presence indicators (e.g., `HAS_INSTALLMENT_HISTORY`, `HAS_PREV_APP_HISTORY`) to allow models to differentiate "no history" from "clean history", especially for linear scorecards.
+- **Phase 8 decision**: The locked 23-feature ablation does not add separate history-presence fields. `INST_TOTAL_COUNT` and `PREV_APP_COUNT` already distinguish absent history from a zero adverse-event count when history exists. The Phase 8 report separately quantifies these states. Missing entry-payment timestamps remain an unresolved feature-definition issue.
 
 ## 7. Missingness Analysis
 For the external scores, missingness is not MCAR (Missing Completely At Random). Missingness itself is associated with higher default risk:

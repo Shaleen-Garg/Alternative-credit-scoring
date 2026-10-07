@@ -1,0 +1,3 @@
+comparison,incremental_roc_auc,incremental_pr_auc,relative_roc_auc_pct,relative_pr_auc_pct
+Bureau added to Application,0.0030062104466241912,0.003576540951498286,0.4121384415381756,1.7145815242185416
+Alternative added to Application + Bureau,0.008660304191334012,0.0075357515466562,1.1824170282550277,3.5517164946187507

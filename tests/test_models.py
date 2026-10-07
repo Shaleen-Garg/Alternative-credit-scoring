@@ -1,48 +1,96 @@
+import tempfile
 import unittest
-import pandas as pd
+from pathlib import Path
+
 import numpy as np
-from src.models import load_and_split_data, build_baseline_pipeline
+import pandas as pd
+from sklearn.model_selection import train_test_split
 
-class TestBaselineModel(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.filepath = r"C:\ujjivan_project\data\processed\feature_master.csv"
-        cls.X_train, cls.X_val, cls.X_test, cls.y_train, cls.y_val, cls.y_test = load_and_split_data(cls.filepath)
-        cls.pipeline = build_baseline_pipeline()
-        
-        cls.X_train_features = cls.X_train.drop(columns=['SK_ID_CURR'])
-        cls.X_val_features = cls.X_val.drop(columns=['SK_ID_CURR'])
-        cls.X_test_features = cls.X_test.drop(columns=['SK_ID_CURR'])
-        
-        # Fit on a tiny sample for speed in tests
-        sample_idx = np.random.choice(len(cls.X_train_features), 1000, replace=False)
-        cls.pipeline.fit(cls.X_train_features.iloc[sample_idx], cls.y_train.iloc[sample_idx])
+from src.models import (
+    APPLICATION_FEATURES, BUREAU_FEATURES, ALTERNATIVE_FEATURES,
+    FEATURE_GROUPS, load_and_split_data, build_pipeline,
+    thin_file_mask,
+)
 
-    def test_split_sizes(self):
-        """Verify sizes are approx 70/15/15"""
-        total = len(self.X_train) + len(self.X_val) + len(self.X_test)
-        self.assertAlmostEqual(len(self.X_train) / total, 0.70, delta=0.01)
-        self.assertAlmostEqual(len(self.X_val) / total, 0.15, delta=0.01)
-        self.assertAlmostEqual(len(self.X_test) / total, 0.15, delta=0.01)
 
-    def test_stratification(self):
-        """Verify TARGET stratification is preserved."""
-        overall_rate = (self.y_train.sum() + self.y_val.sum() + self.y_test.sum()) / (len(self.y_train) + len(self.y_val) + len(self.y_test))
-        self.assertAlmostEqual(self.y_train.mean(), overall_rate, delta=0.005)
-        self.assertAlmostEqual(self.y_val.mean(), overall_rate, delta=0.005)
-        self.assertAlmostEqual(self.y_test.mean(), overall_rate, delta=0.005)
+class TestFeatureGroupsAndModels(unittest.TestCase):
+    def test_feature_groups_are_exact_and_disjoint(self):
+        self.assertEqual(len(APPLICATION_FEATURES), 10)
+        self.assertEqual(len(BUREAU_FEATURES), 6)
+        self.assertEqual(len(ALTERNATIVE_FEATURES), 7)
+        self.assertEqual(len(set(APPLICATION_FEATURES + BUREAU_FEATURES + ALTERNATIVE_FEATURES)), 23)
+        self.assertEqual(FEATURE_GROUPS["Application"], APPLICATION_FEATURES)
+        self.assertEqual(FEATURE_GROUPS["Application + Bureau"], APPLICATION_FEATURES + BUREAU_FEATURES)
+        self.assertEqual(FEATURE_GROUPS["Application + Bureau + Alternative"],
+                         APPLICATION_FEATURES + BUREAU_FEATURES + ALTERNATIVE_FEATURES)
+        for features in FEATURE_GROUPS.values():
+            self.assertNotIn("TARGET", features)
+            self.assertNotIn("SK_ID_CURR", features)
 
-    def test_no_id_or_target_in_predictors(self):
-        """Verify SK_ID_CURR and TARGET are not predictors."""
-        self.assertNotIn('SK_ID_CURR', self.X_train_features.columns)
-        self.assertNotIn('TARGET', self.X_train_features.columns)
+    def _dataset(self, n=600):
+        rng = np.random.default_rng(17)
+        frame = pd.DataFrame({"SK_ID_CURR": np.arange(n), "TARGET": np.tile([0, 1], n // 2)})
+        for feature in APPLICATION_FEATURES + BUREAU_FEATURES + ALTERNATIVE_FEATURES:
+            frame[feature] = rng.normal(size=n)
+        frame["BUREAU_CREDIT_COUNT"] = rng.integers(0, 8, n)
+        frame["INST_TOTAL_COUNT"] = rng.integers(0, 15, n)
+        frame["INST_LATE_PAYMENT_COUNT"] = rng.integers(0, 5, n)
+        frame["APP_EXT_SOURCE_1"] = rng.normal(size=n)
+        frame.loc[:80, "APP_EXT_SOURCE_1"] = np.nan
+        frame["BUREAU_DEBT_RATIO"] = rng.uniform(0, 2, n)
+        frame.loc[:20, "BUREAU_DEBT_RATIO"] = np.nan
+        frame["APP_DAYS_EMPLOYED"] = rng.integers(-10000, 0, n)
+        frame.loc[10, "APP_DAYS_EMPLOYED"] = 365243
+        return frame
 
-    def test_predictions_valid(self):
-        """Verify predictions are probabilities [0,1] and no NaNs."""
-        preds = self.pipeline.predict_proba(self.X_val_features[:100])[:, 1]
-        self.assertEqual(len(preds), 100)
-        self.assertTrue(np.all((preds >= 0.0) & (preds <= 1.0)))
-        self.assertFalse(np.isnan(preds).any())
+    def test_split_repeats_phase_7a_two_stage_stratified_indices(self):
+        frame = self._dataset()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "features.csv"
+            frame.to_csv(path, index=False)
+            result = load_and_split_data(path)
+        expected = train_test_split(frame[["SK_ID_CURR", *APPLICATION_FEATURES]], frame.TARGET,
+                                    test_size=.15, stratify=frame.TARGET, random_state=42)
+        X_train_val, X_test, y_train_val, y_test = expected
+        X_train, X_val, y_train, y_val = train_test_split(
+            X_train_val, y_train_val, test_size=.15 / .85, stratify=y_train_val, random_state=42
+        )
+        for actual, expected_frame in zip(result[:3], [X_train, X_val, X_test]):
+            np.testing.assert_array_equal(actual.SK_ID_CURR, expected_frame.SK_ID_CURR)
+        for actual, expected_target in zip(result[3:], [y_train, y_val, y_test]):
+            np.testing.assert_array_equal(actual.to_numpy(), expected_target.to_numpy())
 
-if __name__ == '__main__':
+    def test_model_preprocessing_is_fitted_on_train_and_outputs_probabilities(self):
+        frame = self._dataset()
+        features = FEATURE_GROUPS["Application + Bureau + Alternative"]
+        train, valid = frame.iloc[:450], frame.iloc[450:]
+        model = build_pipeline(features)
+        model.fit(train[features], train.TARGET)
+        ext_imputer = model.named_steps["preprocessor"].named_transformers_["ext"].named_steps["imputer"]
+        expected_mean = train.APP_EXT_SOURCE_1.mean()
+        self.assertAlmostEqual(ext_imputer.statistics_[0], expected_mean)
+        bureau_imputer = model.named_steps["preprocessor"].named_transformers_["bureau"].named_steps["imputer"]
+        self.assertAlmostEqual(bureau_imputer.statistics_[BUREAU_FEATURES.index("BUREAU_DEBT_RATIO")],
+                               train.BUREAU_DEBT_RATIO.median())
+        transformed = model.named_steps["preprocessor"].transform(valid[features])
+        self.assertTrue(np.isfinite(transformed).all())
+        probabilities = model.predict_proba(valid[features])[:, 1]
+        self.assertEqual(probabilities.shape, (len(valid),))
+        self.assertTrue(np.isfinite(probabilities).all())
+        self.assertTrue(((probabilities >= 0) & (probabilities <= 1)).all())
+
+    def test_invalid_leakage_columns_are_rejected(self):
+        with self.assertRaises(ValueError):
+            build_pipeline(APPLICATION_FEATURES + ["TARGET"])
+        with self.assertRaises(ValueError):
+            build_pipeline(APPLICATION_FEATURES + ["SK_ID_CURR"])
+
+    def test_locked_thin_file_mask_uses_zero_bureau_count(self):
+        frame = pd.DataFrame({"BUREAU_CREDIT_COUNT": [0, 1, 0, 4]})
+        np.testing.assert_array_equal(thin_file_mask(frame), [True, False, True, False])
+        with self.assertRaises(ValueError):
+            thin_file_mask(pd.DataFrame({"PREV_APP_COUNT": [0]}))
+
+
+if __name__ == "__main__":
     unittest.main()

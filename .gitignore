@@ -47,6 +47,8 @@ reports/tables/*
 
 !reports/figures/.gitkeep
 !reports/tables/.gitkeep
+!reports/figures/phase8_*.png
+!reports/tables/phase8_*.csv
 
 # OS
 .DS_Store

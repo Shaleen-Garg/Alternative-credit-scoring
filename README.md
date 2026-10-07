@@ -6,7 +6,7 @@ This project investigates whether alternative behavioral and financial history c
 ## Research Question
 Can alternative behavioral and financial data improve credit-risk prediction for borrowers with limited traditional credit history?
 
-## Planned Approach
+## Modeling Approach
 ```text
 Relational financial data
         ↓
@@ -18,28 +18,23 @@ Statistical analysis
         ↓
 Credit scorecard / Logistic Regression
         ↓
-Gradient Boosting
+Controlled Logistic Regression ablation (A/B/C)
         ↓
-Probability calibration
-        ↓
-Cost-aware decision threshold
-        ↓
-Explainability
-        ↓
-Stability / responsible AI analysis
+Later phases: nonlinear models, calibration, decisions,
+explainability, and stability analysis
 ```
 
-## Planned Experiments
-The primary experiment will compare:
+## Controlled Feature-Group Experiment
+The completed primary experiment compares:
 1. Application-only features
 2. Application + traditional credit information
 3. Application + traditional credit + alternative behavioral information
 
-The comparison must be performed for:
+using the same stratified 70/15/15 train/validation/test split, preprocessing, and class-weighted Logistic Regression configuration. Results are evaluated for:
 - Overall population
 - Thin-file population
 
-The purpose is to determine whether alternative information provides incremental predictive value, particularly for thin-file borrowers.
+The purpose is to estimate whether alternative information adds predictive value beyond application and bureau information, particularly for thin-file borrowers. Measured results and limitations are in [the Phase 8 report](docs/phase8_ablation.md).
 
 ## Evaluation
 Planned metrics:
@@ -68,7 +63,7 @@ Planned metrics:
 The project uses the **Home Credit Default Risk** dataset.
 
 ## Status
-**Repository setup / dataset preparation**
+**Phases 7A, 7B, and 8 complete:** controlled Application, Application + Bureau, and Application + Bureau + Alternative baselines. Alternative history improves ranking performance in the current holdout experiment; this is an observational predictive result, not a causal or production claim.
 
 ## Disclaimer
 This is an educational/research portfolio project and is not a production lending model.

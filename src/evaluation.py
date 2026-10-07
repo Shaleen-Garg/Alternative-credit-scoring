@@ -1,87 +1,122 @@
-import numpy as np
-import pandas as pd
-from sklearn.metrics import roc_auc_score, average_precision_score, brier_score_loss, log_loss
-import matplotlib.pyplot as plt
+"""Evaluation helpers for risk-ranking experiments."""
+
 import os
 
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from sklearn.metrics import (
+    average_precision_score, brier_score_loss, log_loss, precision_recall_curve,
+    roc_auc_score, roc_curve,
+)
+
+
 def evaluate_model(y_true, y_prob):
-    metrics = {
-        'roc_auc': roc_auc_score(y_true, y_prob),
-        'pr_auc': average_precision_score(y_true, y_prob),
-        'brier': brier_score_loss(y_true, y_prob),
-        'log_loss': log_loss(y_true, y_prob)
+    y_true = np.asarray(y_true)
+    y_prob = np.asarray(y_prob)
+    if len(y_true) != len(y_prob) or len(y_true) == 0:
+        raise ValueError("y_true and y_prob must have the same non-zero length")
+    if not np.isfinite(y_prob).all() or (y_prob < 0).any() or (y_prob > 1).any():
+        raise ValueError("Predictions must be finite probabilities in [0, 1]")
+    if np.unique(y_true).size != 2:
+        return {"roc_auc": np.nan, "pr_auc": np.nan,
+                "brier": brier_score_loss(y_true, y_prob),
+                "log_loss": log_loss(y_true, y_prob, labels=[0, 1])}
+    return {
+        "roc_auc": roc_auc_score(y_true, y_prob),
+        "pr_auc": average_precision_score(y_true, y_prob),
+        "brier": brier_score_loss(y_true, y_prob),
+        "log_loss": log_loss(y_true, y_prob, labels=[0, 1]),
     }
-    return metrics
+
+
+def extract_coefficients(pipeline, feature_groups=None):
+    """Return standardized model coefficients with feature names and group labels."""
+    names = pipeline.named_steps["preprocessor"].get_feature_names_out()
+    names = [name.split("__", 1)[-1] for name in names]
+    coef = pipeline.named_steps["clf"].coef_[0]
+    group_map = {}
+    for group, features in (feature_groups or {}).items():
+        for feature in features:
+            group_map[feature] = group
+    frame = pd.DataFrame({"feature": names, "coefficient": coef})
+    frame["odds_ratio_per_sd"] = np.exp(np.clip(frame["coefficient"], -700, 700))
+    frame["feature_group"] = frame.feature.map(group_map).fillna("Missingness indicator")
+    frame["abs_coefficient"] = frame.coefficient.abs()
+    return frame.sort_values("abs_coefficient", ascending=False).drop(columns="abs_coefficient")
+
+
+def _save(fig, save_path):
+    if save_path:
+        os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
+        fig.savefig(save_path, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+
 
 def plot_roc_curve(y_true, y_prob, save_path=None):
-    from sklearn.metrics import roc_curve
     fpr, tpr, _ = roc_curve(y_true, y_prob)
-    plt.figure()
-    plt.plot(fpr, tpr, label=f'AUC = {roc_auc_score(y_true, y_prob):.3f}')
-    plt.plot([0, 1], [0, 1], 'k--')
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('ROC Curve')
-    plt.legend()
-    if save_path:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        plt.savefig(save_path)
-    plt.close()
+    fig, ax = plt.subplots()
+    ax.plot(fpr, tpr, label=f"ROC-AUC = {roc_auc_score(y_true, y_prob):.3f}")
+    ax.plot([0, 1], [0, 1], "k--")
+    ax.set(xlabel="False positive rate", ylabel="True positive rate", title="ROC curve")
+    ax.legend()
+    _save(fig, save_path)
+
 
 def plot_pr_curve(y_true, y_prob, save_path=None):
-    from sklearn.metrics import precision_recall_curve
     precision, recall, _ = precision_recall_curve(y_true, y_prob)
-    plt.figure()
-    plt.plot(recall, precision, label=f'PR-AUC = {average_precision_score(y_true, y_prob):.3f}')
-    plt.xlabel('Recall')
-    plt.ylabel('Precision')
-    plt.title('Precision-Recall Curve')
-    plt.legend()
-    if save_path:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        plt.savefig(save_path)
-    plt.close()
+    fig, ax = plt.subplots()
+    ax.plot(recall, precision, label=f"PR-AUC = {average_precision_score(y_true, y_prob):.3f}")
+    ax.set(xlabel="Recall", ylabel="Precision", title="Precision-recall curve")
+    ax.legend()
+    _save(fig, save_path)
+
 
 def plot_prob_distribution(y_true, y_prob, save_path=None):
-    import seaborn as sns
-    df = pd.DataFrame({'Target': y_true, 'Probability': y_prob})
-    plt.figure()
-    sns.kdeplot(data=df[df['Target']==0]['Probability'], label='TARGET=0', fill=True)
-    sns.kdeplot(data=df[df['Target']==1]['Probability'], label='TARGET=1', fill=True)
-    plt.xlabel('Predicted Probability')
-    plt.title('Predicted Probability Distribution')
-    plt.legend()
-    if save_path:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        plt.savefig(save_path)
-    plt.close()
+    frame = pd.DataFrame({"target": np.asarray(y_true), "probability": np.asarray(y_prob)})
+    fig, ax = plt.subplots()
+    for target, label in [(0, "Non-default"), (1, "Default")]:
+        values = frame.loc[frame.target == target, "probability"]
+        ax.hist(values, bins=40, density=True, alpha=.45, label=label)
+    ax.set(xlabel="Predicted probability", ylabel="Density", title="Test probability distribution")
+    ax.legend()
+    _save(fig, save_path)
 
-def extract_coefficients(pipeline):
-    clf = pipeline.named_steps['clf']
-    preprocessor = pipeline.named_steps['preprocessor']
-    
-    # Get feature names from ColumnTransformer
-    ext_cols = ['APP_EXT_SOURCE_1', 'APP_EXT_SOURCE_2', 'APP_EXT_SOURCE_3']
-    ext_missing = [f"{c}_missing_indicator" for c in ext_cols]
-    
-    # SimpleImputer add_indicator puts the indicators AFTER the original features
-    # Wait, the shape of ext_transformer output will be (N, 3 + number_of_missing_cols).
-    # Since all 3 have missing values, there are 3 indicators.
-    ext_feat_names = ext_cols + ext_missing
-    
-    other_num_cols = [
-        'APP_INCOME_TOTAL', 'APP_CREDIT_AMOUNT', 'APP_ANNUITY',
-        'APP_DAYS_BIRTH', 'APP_DAYS_EMPLOYED', 
-        'APP_CREDIT_INCOME_RATIO', 'APP_ANNUITY_INCOME_RATIO'
-    ]
-    
-    feature_names = ext_feat_names + other_num_cols
-    coefs = clf.coef_[0]
-    
-    df_coef = pd.DataFrame({
-        'feature': feature_names,
-        'coefficient': coefs,
-        'odds_ratio': np.exp(coefs)
-    })
-    df_coef['abs_coef'] = df_coef['coefficient'].abs()
-    return df_coef.sort_values('abs_coef', ascending=False).drop('abs_coef', axis=1)
+
+def plot_model_comparison(y_true, predictions, save_path, metric="roc_auc"):
+    from sklearn.metrics import auc
+    fig, ax = plt.subplots()
+    for name, prob in predictions.items():
+        if metric == "roc_auc":
+            x, y, _ = roc_curve(y_true, prob)
+            score = auc(x, y)
+            ax.plot(x, y, label=f"{name} ({score:.3f})")
+        else:
+            y, x, _ = precision_recall_curve(y_true, prob)
+            score = average_precision_score(y_true, prob)
+            ax.plot(x, y, label=f"{name} ({score:.3f})")
+    if metric == "roc_auc":
+        ax.plot([0, 1], [0, 1], "k--")
+        ax.set(xlabel="False positive rate", ylabel="True positive rate", title="Test ROC curves")
+    else:
+        ax.set(xlabel="Recall", ylabel="Precision", title="Test precision-recall curves")
+    ax.legend()
+    _save(fig, save_path)
+
+
+def plot_metric_bars(frame, metric, save_path, title=None):
+    fig, ax = plt.subplots()
+    ax.bar(frame["model"], frame[metric], color=["#4C78A8", "#F58518", "#54A24B"][:len(frame)])
+    ax.set_ylabel(metric.upper())
+    ax.set_title(title or f"Test {metric.upper()} comparison")
+    ax.tick_params(axis="x", rotation=18)
+    _save(fig, save_path)
+
+
+def plot_coefficients(coefficients, save_path, feature_group="Alternative Behaviour"):
+    selected = coefficients[coefficients.feature_group == feature_group].sort_values("coefficient")
+    fig, ax = plt.subplots(figsize=(8, max(3, .35 * len(selected))))
+    ax.barh(selected.feature, selected.coefficient, color="#54A24B")
+    ax.axvline(0, color="black", linewidth=.8)
+    ax.set(xlabel="Standardized coefficient", title=f"{feature_group} coefficients")
+    _save(fig, save_path)
