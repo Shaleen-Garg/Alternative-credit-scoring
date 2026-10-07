@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data
+data/raw/*
+data/interim/*
+data/processed/*
+
+# Keep directory structure
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+
+# Large data files
+*.csv
+*.csv.gz
+*.zip
+*.parquet
+*.feather
+*.pkl
+*.pickle
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated outputs
+reports/figures/*
+reports/tables/*
+
+!reports/figures/.gitkeep
+!reports/tables/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

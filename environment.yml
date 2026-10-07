@@ -1,0 +1,19 @@
+name: alternative-credit-scoring
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pandas
+  - numpy
+  - scipy
+  - scikit-learn
+  - matplotlib
+  - seaborn
+  - jupyter
+  - sqlalchemy
+  - psycopg2
+  - xgboost
+  - shap
+  - statsmodels
+  - openpyxl
