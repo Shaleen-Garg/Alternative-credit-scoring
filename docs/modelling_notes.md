@@ -6,9 +6,11 @@ Baseline
     ↓
 Logistic Regression / Credit Scorecard
     ↓
-Gradient Boosting
+Controlled feature-group ablation (Application → Bureau → non-bureau behaviour)
     ↓
-Calibration
+HistGradientBoosting robustness comparison
+    ↓
+Probability calibration
     ↓
 Decision analysis
     ↓

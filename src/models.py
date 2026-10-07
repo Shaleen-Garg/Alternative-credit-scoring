@@ -26,7 +26,7 @@ BUREAU_FEATURES = [
 ALTERNATIVE_FEATURES = [
     "PREV_APP_COUNT", "PREV_APPROVED_COUNT", "PREV_REFUSED_COUNT",
     "INST_TOTAL_COUNT", "INST_LATE_PAYMENT_COUNT", "INST_LATE_PAYMENT_RATIO",
-    "INST_UNDERPAYMENT_COUNT",
+    "INST_UNDERPAYMENT_COUNT", "INST_PAYMENT_MISSING_COUNT",
 ]
 FEATURE_GROUPS = {
     "Application": APPLICATION_FEATURES,
@@ -34,6 +34,7 @@ FEATURE_GROUPS = {
     "Application + Bureau + Alternative": APPLICATION_FEATURES + BUREAU_FEATURES + ALTERNATIVE_FEATURES,
 }
 SPLIT_SEED = 42
+SPLIT_DIR = Path("data/processed/splits")
 THIN_FILE_COLUMN = "BUREAU_CREDIT_COUNT"
 THIN_FILE_VALUE = 0
 
@@ -45,23 +46,72 @@ def thin_file_mask(frame):
     return frame[THIN_FILE_COLUMN].eq(THIN_FILE_VALUE)
 
 
-def load_and_split_data(filepath, random_state=SPLIT_SEED):
-    """Load features and recreate Phase 7A's exact two-stage stratified split."""
+def create_phase7a_split_artifacts(filepath, output_dir=SPLIT_DIR):
+    """Create ID files once using the original two-stage Phase 7A split recipe."""
+    df = pd.read_csv(filepath)
+    if "SK_ID_CURR" not in df or "TARGET" not in df:
+        raise ValueError("Split generation requires SK_ID_CURR and TARGET")
+    if df.SK_ID_CURR.duplicated().any():
+        raise ValueError("SK_ID_CURR must be unique before generating split IDs")
+    X = df[["SK_ID_CURR"]]
+    y = df["TARGET"].copy()
+    X_train_val, X_test, y_train_val, y_test = train_test_split(
+        X, y, test_size=0.15, stratify=y, random_state=SPLIT_SEED
+    )
+    X_train, X_val, y_train, y_val = train_test_split(
+        X_train_val, y_train_val, test_size=(0.15 / 0.85), stratify=y_train_val,
+        random_state=SPLIT_SEED,
+    )
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    for name, split in (("train", X_train), ("validation", X_val), ("test", X_test)):
+        split[["SK_ID_CURR"]].to_csv(destination / f"{name}_ids.csv", index=False)
+    return {"train": X_train.SK_ID_CURR.to_numpy(), "validation": X_val.SK_ID_CURR.to_numpy(),
+            "test": X_test.SK_ID_CURR.to_numpy()}
+
+
+def load_split_ids(population_ids, split_dir=SPLIT_DIR):
+    """Load explicit split ID files and validate them against the modeling population."""
+    directory = Path(split_dir)
+    population = pd.Index(population_ids)
+    if population.has_duplicates:
+        raise ValueError("Modeling population contains duplicate SK_ID_CURR values")
+    split_ids = {}
+    for name in ("train", "validation", "test"):
+        path = directory / f"{name}_ids.csv"
+        if not path.exists():
+            raise FileNotFoundError(f"Required explicit split artifact not found: {path}")
+        ids = pd.read_csv(path)
+        if list(ids.columns) != ["SK_ID_CURR"] or ids.SK_ID_CURR.duplicated().any():
+            raise ValueError(f"Invalid or duplicate IDs in {path}")
+        split_ids[name] = ids.SK_ID_CURR.tolist()
+    sets = {name: set(ids) for name, ids in split_ids.items()}
+    if sets["train"] & sets["validation"] or sets["train"] & sets["test"] or sets["validation"] & sets["test"]:
+        raise ValueError("Train, validation, and test split IDs overlap")
+    if set.union(*sets.values()) != set(population):
+        raise ValueError("Split ID union does not equal the current modeling population")
+    return split_ids
+
+
+def load_and_split_data(filepath, split_dir=SPLIT_DIR):
+    """Load model data in the persisted Phase 7A borrower-ID split order."""
     df = pd.read_csv(filepath)
     required = ["SK_ID_CURR", "TARGET", *APPLICATION_FEATURES, *BUREAU_FEATURES, *ALTERNATIVE_FEATURES]
     missing = sorted(set(required) - set(df.columns))
     if missing:
         raise ValueError(f"Feature dataset is missing required columns: {missing}")
-    X = df[["SK_ID_CURR", *APPLICATION_FEATURES, *BUREAU_FEATURES, *ALTERNATIVE_FEATURES]].copy()
-    y = df["TARGET"].copy()
-    X_train_val, X_test, y_train_val, y_test = train_test_split(
-        X, y, test_size=0.15, stratify=y, random_state=random_state
-    )
-    X_train, X_val, y_train, y_val = train_test_split(
-        X_train_val, y_train_val, test_size=(0.15 / 0.85), stratify=y_train_val,
-        random_state=random_state,
-    )
-    return X_train, X_val, X_test, y_train, y_val, y_test
+    if df.SK_ID_CURR.duplicated().any():
+        raise ValueError("SK_ID_CURR must be unique in the feature dataset")
+    split_ids = load_split_ids(df.SK_ID_CURR, split_dir)
+    indexed = df.set_index("SK_ID_CURR", drop=False)
+    X_parts, y_parts = [], []
+    for name in ("train", "validation", "test"):
+        part = indexed.loc[split_ids[name]]
+        X_parts.append(part[["SK_ID_CURR", *APPLICATION_FEATURES, *BUREAU_FEATURES, *ALTERNATIVE_FEATURES]].copy())
+        y_parts.append(part["TARGET"].copy())
+    if len(df) == 307511 and [len(x) for x in X_parts] != [215257, 46127, 46127]:
+        raise ValueError("Persisted split sizes do not match the verified Phase 8 population")
+    return (*X_parts, *y_parts)
 
 
 def build_pipeline(features):

@@ -17,7 +17,7 @@ from src.models import FEATURE_GROUPS, load_and_split_data, build_pipeline, thin
 MODEL_KEYS = list(FEATURE_GROUPS)
 
 
-def _bootstrap_delta(y, first, second, seed=42, repetitions=300):
+def _bootstrap_delta(y, first, second, seed=42, repetitions=2000):
     """Percentile interval for paired second-minus-first metric difference."""
     y = np.asarray(y)
     first, second = np.asarray(first), np.asarray(second)
@@ -34,8 +34,9 @@ def _bootstrap_delta(y, first, second, seed=42, repetitions=300):
             for metric, values in deltas.items()}
 
 
-def run_ablation(filepath="data/processed/feature_master.csv", output_dir="reports"):
-    X_train, X_val, X_test, y_train, y_val, y_test = load_and_split_data(filepath)
+def run_ablation(filepath="data/processed/feature_master.csv", output_dir="reports",
+                 split_dir="data/processed/splits"):
+    X_train, X_val, X_test, y_train, y_val, y_test = load_and_split_data(filepath, split_dir)
     splits = {"train": (X_train, y_train), "validation": (X_val, y_val), "test": (X_test, y_test)}
     predictions = {split: {} for split in splits}
     fitted = {}
@@ -131,8 +132,9 @@ def run_ablation(filepath="data/processed/feature_master.csv", output_dir="repor
             ("Previous history, positive refusals", frame.PREV_REFUSED_COUNT > 0),
             ("Installment history", frame.INST_TOTAL_COUNT > 0),
             ("No installment history", frame.INST_TOTAL_COUNT == 0),
-            ("Installment history, zero late payments", (frame.INST_TOTAL_COUNT > 0) & (frame.INST_LATE_PAYMENT_COUNT == 0)),
-            ("Installment history, positive late payments", frame.INST_LATE_PAYMENT_COUNT > 0),
+            ("Installment history with missing payment information", frame.INST_PAYMENT_MISSING_COUNT > 0),
+            ("Installment history, zero recorded late payments", (frame.INST_TOTAL_COUNT > 0) & (frame.INST_LATE_PAYMENT_COUNT == 0)),
+            ("Installment history, positive recorded late payments", frame.INST_LATE_PAYMENT_COUNT > 0),
             ("Installment history, zero underpayments", (frame.INST_TOTAL_COUNT > 0) & (frame.INST_UNDERPAYMENT_COUNT == 0)),
             ("Installment history, positive underpayments", frame.INST_UNDERPAYMENT_COUNT > 0),
         ]
@@ -171,10 +173,12 @@ def run_ablation(filepath="data/processed/feature_master.csv", output_dir="repor
                 row["delta_thin_file_pr_auc_vs_full"] = thin_values["pr_auc"] - full_thin.pr_auc
             sensitivity_rows.append(row)
     pd.DataFrame(sensitivity_rows).to_csv(tables / "phase8_redundancy_sensitivity.csv", index=False)
-    ci_overall = _bootstrap_delta(y_test_np, predictions_test[MODEL_KEYS[1]], predictions_test[MODEL_KEYS[2]])
-    ci_thin = _bootstrap_delta(y_test_np[thin], predictions_test[MODEL_KEYS[1]][thin], predictions_test[MODEL_KEYS[2]][thin])
+    bootstrap_repetitions = 2000
+    ci_overall = _bootstrap_delta(y_test_np, predictions_test[MODEL_KEYS[1]], predictions_test[MODEL_KEYS[2]], repetitions=bootstrap_repetitions)
+    ci_thin = _bootstrap_delta(y_test_np[thin], predictions_test[MODEL_KEYS[1]][thin], predictions_test[MODEL_KEYS[2]][thin], repetitions=bootstrap_repetitions)
     pd.DataFrame([
-        {"cohort": cohort, "metric": metric, "ci_2_5_pct": interval[0], "ci_97_5_pct": interval[1]}
+        {"cohort": cohort, "metric": metric, "resamples": bootstrap_repetitions,
+         "ci_2_5_pct": interval[0], "ci_97_5_pct": interval[1]}
         for cohort, intervals in [("Overall test", ci_overall), ("Thin-file test", ci_thin)]
         for metric, interval in intervals.items()
     ]).to_csv(tables / "phase8_incremental_bootstrap_ci.csv", index=False)
@@ -189,8 +193,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", default="data/processed/feature_master.csv")
     parser.add_argument("--output", default="reports")
+    parser.add_argument("--splits", default="data/processed/splits")
     args = parser.parse_args()
-    result = run_ablation(args.data, args.output)
+    result = run_ablation(args.data, args.output, args.splits)
     print("Split sizes:", [len(split) for split in result["splits"]])
     print(result["summary"].to_string(index=False))
     print(result["increments"].to_string(index=False))

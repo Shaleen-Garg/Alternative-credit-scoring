@@ -1,10 +1,12 @@
-# Phase 8: Controlled Feature-Group Ablation
+# Phase 8: Controlled Linear Feature-Group Ablation
 
 ## Audit and experiment controls
 
-The repository already had a point-in-time feature plan, a one-row-per-application master table, explicit exclusion of target and application ID from predictors, and a deterministic two-stage stratified split. Feature SQL aggregates bureau, previous-application, and installment rows by borrower before joining them to the application table, avoiding join fan-out. The 7A pipeline fits imputation and scaling within the training pipeline. No split index file had been saved, so this work reproduces the original 70/15/15 `train_test_split` calls with seed 42; the refit application model reproduces the Phase 7A test ROC-AUC to the published precision.
+Feature SQL aggregates bureau, previous-application, and installment rows by borrower before joining the application table, avoiding join fan-out. Predictors exclude `TARGET` and `SK_ID_CURR`. The original two-stage stratified split is frozen in `data/processed/splits/{train,validation,test}_ids.csv`; every later phase must load these IDs rather than generate a new split. The artifacts contain identifiers only, have zero overlap, and their union is all 307,511 modelling applicants.
 
-The Phase 7B notebook was still a TODO and modeling code only exposed the application-only list. I centralized the 10 application, 6 bureau, and 7 alternative feature lists, retained the original preprocessing and Logistic Regression setup, then reused that pipeline for all three models. No target/ID columns are accepted as predictors. `DAYS_EMPLOYED == 365243` is changed to missing before training-only median imputation. External-source means and missingness indicators are learned within each model's training fit. Other numerical predictors use training-only medians and standard scaling. No winsorization, calibration, thresholds, or boosting were introduced.
+The audit found 2,905 of 13,605,401 raw installment rows have both `DAYS_ENTRY_PAYMENT` and `AMT_PAYMENT` missing. The source dictionary describes those fields as when/how much was actually paid, but does not explain nulls. Their scheduled due dates precede the current application; this alone does not establish whether they were unpaid or absent for another reason. The corrected SQL excludes these events from observed late/underpayment measures and counts them separately as `INST_PAYMENT_MISSING_COUNT`. `INST_LATE_PAYMENT_RATIO` is late events divided by rows with observed payment and scheduled dates. If a borrower has installment rows but none with observed payment dates, the ratio remains missing and is imputed using training data. This adds one justified non-bureau behavioural feature to the original 23-feature group (24 predictors total). The earlier Phase 8 result, tables, and plots are preserved under `reports/phase8_benchmark_v1/`.
+
+The feature table was regenerated. Model A and B results remain unchanged; all three models were rerun. Preprocessing is fitted on train only. Application external-source features use training means and missingness indicators; other linear-model inputs use training medians and standardization. `APP_DAYS_EMPLOYED == 365243` is treated as missing. Bureau ratio missingness uses training median imputation and a training-fitted indicator. No calibration, threshold selection, or boosting was used in this phase.
 
 ## Feature groups and split sizes
 
@@ -12,90 +14,85 @@ The Phase 7B notebook was still a TODO and modeling code only exposed the applic
 |---|---|
 | A — Application | `APP_INCOME_TOTAL`, `APP_CREDIT_AMOUNT`, `APP_ANNUITY`, `APP_DAYS_BIRTH`, `APP_DAYS_EMPLOYED`, `APP_EXT_SOURCE_1`, `APP_EXT_SOURCE_2`, `APP_EXT_SOURCE_3`, `APP_CREDIT_INCOME_RATIO`, `APP_ANNUITY_INCOME_RATIO` |
 | B — Application + Bureau | Model A plus `BUREAU_CREDIT_COUNT`, `BUREAU_ACTIVE_COUNT`, `BUREAU_TOTAL_CREDIT`, `BUREAU_TOTAL_DEBT`, `BUREAU_DEBT_RATIO`, `BUREAU_AVG_DAYS_CREDIT` |
-| C — Application + Bureau + Alternative | Model B plus `PREV_APP_COUNT`, `PREV_APPROVED_COUNT`, `PREV_REFUSED_COUNT`, `INST_TOTAL_COUNT`, `INST_LATE_PAYMENT_COUNT`, `INST_LATE_PAYMENT_RATIO`, `INST_UNDERPAYMENT_COUNT` |
+| C — Application + Bureau + Alternative / non-bureau behaviour | Model B plus `PREV_APP_COUNT`, `PREV_APPROVED_COUNT`, `PREV_REFUSED_COUNT`, `INST_TOTAL_COUNT`, `INST_LATE_PAYMENT_COUNT`, `INST_LATE_PAYMENT_RATIO`, `INST_UNDERPAYMENT_COUNT`, `INST_PAYMENT_MISSING_COUNT` |
 
-The exact 70/15/15 row counts are train **215,257**, validation **46,127**, and test **46,127**. The split was regenerated from the same dataset row order, target, two-stage stratification, and seed used by Phase 7A.
+Train: **215,257**; validation: **46,127**; test: **46,127**. The split files retain the Phase 7A borrower assignment and order.
 
 ## Overall performance
 
-All three models use `LogisticRegression(C=1.0, class_weight='balanced')` with the same preprocessing. ROC-AUC and average precision (PR-AUC) are ranking metrics; Brier and log loss are included as requested, but raw probabilities from this class-weighted model are not calibrated default probabilities.
+Every model uses `LogisticRegression(C=1.0, class_weight='balanced')` with the same preprocessing. ROC-AUC and PR-AUC (average precision) measure ranking. Brier and log loss are reported, but the class-weighted raw probabilities are not calibrated default probabilities.
 
 | Split | Model | ROC-AUC | PR-AUC | Brier | Log loss |
 |---|---|---:|---:|---:|---:|
 | Train | A — Application | 0.726838 | 0.202485 | 0.211059 | 0.610679 |
 | Train | B — + Bureau | 0.729488 | 0.206388 | 0.210186 | 0.608573 |
-| Train | C — + Alternative | 0.738578 | 0.214124 | 0.206888 | 0.601847 |
+| Train | C — + Non-bureau behaviour | 0.738823 | 0.214728 | 0.206752 | 0.601658 |
 | Validation | A — Application | 0.731575 | 0.214745 | 0.210390 | 0.609052 |
 | Validation | B — + Bureau | 0.734062 | 0.218716 | 0.209609 | 0.607154 |
-| Validation | C — + Alternative | 0.741816 | 0.222412 | 0.206594 | 0.601123 |
+| Validation | C — + Non-bureau behaviour | 0.742421 | 0.222855 | 0.206402 | 0.600722 |
 | Test | A — Application | **0.729418** | **0.208596** | 0.210476 | 0.609418 |
 | Test | B — + Bureau | **0.732424** | **0.212172** | 0.209441 | 0.607029 |
-| Test | C — + Alternative | **0.741084** | **0.219708** | 0.205795 | 0.599472 |
+| Test | C — + Non-bureau behaviour | **0.741447** | **0.221676** | 0.205648 | 0.599153 |
 
 | Test comparison | ROC-AUC change | Relative change | PR-AUC change | Relative change |
 |---|---:|---:|---:|---:|
 | Bureau added to A | +0.003006 | +0.41% | +0.003577 | +1.71% |
-| Alternative added to B | **+0.008660** | **+1.18%** | **+0.007536** | **+3.55%** |
+| Non-bureau behaviour added to B | **+0.009023** | **+1.23%** | **+0.009504** | **+4.48%** |
 
-The original Phase 7A report gave 0.7294 ROC-AUC and 0.2085 PR-AUC; this refit gives 0.729418 and 0.208596, consistent at the stated ROC precision and differing by 0.0001 in PR-AUC at four decimal places. Bureau information yields a modest population-wide improvement. Alternative features add a larger, consistent ranking gain on validation and test, but the gain is still an incremental result on one random holdout, not evidence of causal impact or production value.
+The refit Phase 7A model gives 0.729418 ROC-AUC and 0.208596 PR-AUC, matching its reported 0.7294 and 0.2085 to the stated precision. Compared with the frozen pre-missingness benchmark (Model C 0.741084 / 0.219708 overall; 0.708819 / 0.232135 thin-file), corrected Model C is +0.000363 ROC-AUC and +0.001968 PR-AUC overall, and +0.001181 / +0.005817 in thin-file. Models A and B are unchanged. The conclusion is unchanged and slightly stronger after correcting the treatment of unknown installment events.
 
-## Thin-file and non-thin-file results
+The Phase 8 test set has already been inspected in the previous benchmark, including subgroup, coefficient, redundancy, and bootstrap analyses. It is not an untouched test set. Results are frozen now; future model and calibration choices use train/validation only, with test reserved for predefined final comparisons.
 
-Thin-file remains the prespecified definition `BUREAU_CREDIT_COUNT == 0`; it was not changed after looking at outcomes. The full population contains 44,020 thin-file records. Holdout subgroup metrics are:
+## Thin-file and non-thin-file performance
+
+Thin-file remains `BUREAU_CREDIT_COUNT == 0`, fixed before modelling. The full population has 44,020 thin-file applicants.
 
 | Test cohort | n | Model A ROC / PR | Model B ROC / PR | Model C ROC / PR |
 |---|---:|---:|---:|---:|
-| Overall | 46,127 | 0.729418 / 0.208596 | 0.732424 / 0.212172 | 0.741084 / 0.219708 |
-| Thin-file | 6,534 | 0.691025 / 0.211024 | 0.691050 / 0.211087 | **0.708819 / 0.232135** |
-| Non-thin-file | 39,593 | 0.734491 / 0.209345 | 0.738019 / 0.214031 | 0.745402 / 0.218604 |
+| Overall | 46,127 | 0.729418 / 0.208596 | 0.732424 / 0.212172 | 0.741447 / 0.221676 |
+| Thin-file | 6,534 | 0.691025 / 0.211024 | 0.691050 / 0.211087 | **0.710000 / 0.237952** |
+| Non-thin-file | 39,593 | 0.734491 / 0.209345 | 0.738019 / 0.214031 | 0.745645 / 0.219875 |
 
-On thin-file test borrowers, bureau features barely change the score (ROC-AUC +0.000024; PR-AUC +0.000063), as expected when bureau history is absent. Adding alternative history to B improves thin-file ROC-AUC by **0.017769** and PR-AUC by **0.021048**. The direction is also positive on validation: Model C versus B changes thin-file ROC-AUC from 0.696906 to 0.715807 and PR-AUC from 0.213772 to 0.220168. The result supports incremental ranking signal for this cohort in this dataset; it does not prove generalization to other lenders or borrowers.
+Bureau features barely change thin-file performance (ROC-AUC +0.000024, PR-AUC +0.000063). Adding non-bureau behavioural history to Model B improves thin-file ROC-AUC by **0.018951** and PR-AUC by **0.026865**. The gain is directionally positive on validation as well: Model C versus B thin-file ROC-AUC is 0.717217 versus 0.696906, and PR-AUC is 0.222163 versus 0.213772.
 
-Paired bootstrap intervals (300 resamples, test set) for Model C minus Model B were:
+## Bootstrap uncertainty
+
+Paired bootstrap intervals based on **2,000** test resamples for Model C minus Model B:
 
 | Cohort | Metric | 95% percentile interval |
 |---|---|---:|
-| Overall | ROC-AUC | [0.00623, 0.01114] |
-| Overall | PR-AUC | [0.00166, 0.01258] |
-| Thin-file | ROC-AUC | [0.00996, 0.02524] |
-| Thin-file | PR-AUC | [0.00328, 0.03791] |
+| Overall | ROC-AUC | [0.00657, 0.01155] |
+| Overall | PR-AUC | [0.00408, 0.01458] |
+| Thin-file | ROC-AUC | [0.01074, 0.02750] |
+| Thin-file | PR-AUC | [0.01002, 0.04379] |
 
-These intervals describe resampling uncertainty on this held-out sample, not model or dataset shift uncertainty.
+The intervals describe resampling uncertainty within this historical holdout, not dataset or time-shift uncertainty.
 
-## Alternative-history coverage and zero interpretation
+## Non-bureau history coverage and zero interpretation
 
-Recomputing on the current feature master gives 41,550 of 44,020 thin-file borrowers (**94.39%**) with previous-application history. Installment history exists for 41,640 (**94.59%**). Either previous-application or installment history exists for 41,780 (**94.91%**). Thus 94.4% corresponds to previous applications alone; combining the two included alternative sources yields 94.9% coverage. “Not thin-file” is not used as a proxy for alternative-history coverage.
+Of 44,020 thin-file applicants, 41,550 (**94.39%**) have previous-application history; 41,640 (**94.59%**) have installment history; and 41,780 (**94.91%**) have either. The previously quoted 94.4% refers to previous applications alone. Among thin-file applicants, 252 (**0.57%**) have installment history with at least one row missing actual payment information. The feature `INST_PAYMENT_MISSING_COUNT` marks these unknowns; it does not assert that they were unpaid.
 
-Among the 44,020 thin-file borrowers, 21,079 have installment history and zero recorded late-payment events, while 2,380 have no installment rows. For underpayment, 24,996 have installment history and zero recorded underpayment events; 2,380 have no installment rows. `INST_TOTAL_COUNT` differentiates these cases in the model's fixed feature set. Previous-application counts similarly distinguish absent history from histories with zero approvals or refusals. No extra history-presence features were added because the core experiment's 23-feature set is locked.
+`INST_TOTAL_COUNT` distinguishes no installment records from history with zero observed late events. Previous-application counts distinguish no application history from histories with zero approvals/refusals. Among thin-file applicants, 21,079 have installment history and zero recorded late events; 24,996 have history and zero recorded underpayments.
 
 ## Redundancy and coefficients
 
-Within the thin-file test group, Pearson correlation is **0.911** between `INST_LATE_PAYMENT_COUNT` and `INST_UNDERPAYMENT_COUNT`; late count and late ratio correlate at 0.667. A diagnostic leave-one-feature-out fit (not used to select the core Model C) found removing late-payment count changed test ROC-AUC by -0.000030 and PR-AUC by -0.000183; removing underpayment count changed them by +0.000018 and +0.000030. Removing late-payment ratio reduced ROC-AUC by 0.002238 and PR-AUC by 0.003698. The two highly correlated counts add little measurable conditional ranking value in this linear setup; both remain in the mandated core feature set, with no post-hoc cherry-picking.
+In the thin-file test group, `INST_LATE_PAYMENT_COUNT` and `INST_UNDERPAYMENT_COUNT` remain highly correlated (r = **0.911**); late count and late ratio correlate at 0.667. Leave-one-feature-out diagnostic refits found removing late count changed test ROC-AUC by -0.000056 / PR-AUC -0.000170, and removing underpayment count changed them by +0.000018 / +0.000019. Removing late ratio reduced ROC-AUC by 0.002327 and PR-AUC by 0.003833. The correlated counts add little measurable conditional value in this linear model, but are retained in the predefined feature set.
 
-Largest standardized Model C associations on the fitted model:
+Largest Model C standardized associations:
 
 | Feature | Coefficient | Odds ratio per standardized unit | Direction |
 |---|---:|---:|---|
 | `APP_EXT_SOURCE_2` | -0.426 | 0.653 | Higher score associated with lower predicted risk |
 | `APP_EXT_SOURCE_3` | -0.392 | 0.676 | Higher score associated with lower predicted risk |
-| `APP_EXT_SOURCE_1` | -0.250 | 0.778 | Higher score associated with lower predicted risk |
-| `INST_LATE_PAYMENT_RATIO` | +0.209 | 1.233 | Higher late-payment share associated with higher predicted risk |
-| `PREV_APPROVED_COUNT` | -0.171 | 0.842 | More approvals associated with lower predicted risk |
-| `BUREAU_DEBT_RATIO` | +0.134 | 1.143 | Higher debt ratio associated with higher predicted risk |
-| `BUREAU_ACTIVE_COUNT` | +0.131 | 1.140 | More active accounts associated with higher predicted risk |
+| `APP_EXT_SOURCE_1` | -0.250 | 0.779 | Higher score associated with lower predicted risk |
+| `INST_LATE_PAYMENT_RATIO` | +0.211 | 1.235 | Higher observed late share associated with higher predicted risk |
+| `PREV_APPROVED_COUNT` | -0.171 | 0.843 | More approvals associated with lower predicted risk |
+| `BUREAU_DEBT_RATIO` | +0.134 | 1.144 | Higher debt ratio associated with higher predicted risk |
 
-These are conditional associations, not causal effects. Counts and rates are correlated; notably `INST_LATE_PAYMENT_COUNT` (-0.026) and `INST_UNDERPAYMENT_COUNT` (-0.012) have small negative conditional coefficients despite adverse univariate meanings. This is a suppression/collinearity warning, not evidence that adverse payment events are protective. The external scores remain the largest coefficients.
+These are conditional associations, not causal effects. Correlated count features have small negative conditional coefficients despite adverse univariate meanings; this is a collinearity/suppression warning, not evidence of protection.
 
-## Audit findings and remaining risks
+## Remaining technical risks and artifacts
 
-Solid foundations: borrower-level aggregation before joins; one-row-per-application feature master; locked thin-file definition; deterministic stratification; application-only model with documented results; target and ID exclusion; and train-fitted imputation/scaling.
+The explicit split depends on the original Home Credit modeling population IDs; the loader fails if IDs are missing, duplicated, overlapping, or incomplete. Null payment reasons remain unspecified in source documentation, so the corrected representation records uncertainty rather than inferring nonpayment. Results from this single historical benchmark do not establish out-of-time stability, calibration, fairness, or business utility.
 
-Changes in this phase: centralized the 23 predictors and model-building pipeline; implemented Phase 7B and A/B/C evaluation, subgroup and coverage tables, bootstrap deltas, coefficient and redundancy diagnostics; replaced the Phase 8 notebook TODO with the reproducible runner; updated README and added Phase 7B/8 reports; and added synthetic tests for feature membership, leakage exclusion, exact split reproduction, train-only statistics, finite transforms, and probabilities.
-
-The audit also found that bureau SQL was coercing an undefined debt ratio to zero for people who did have bureau records. The SQL now preserves that value as missing, keeps zero for borrowers with no bureau rows, and the bureau preprocessing fits a median and missingness indicator on training data. There are 8,337 undefined bureau ratios, including 1,083 with a zero/NULL total-credit denominator; the corrected feature table was regenerated and split borrower IDs were verified identical to the pre-fix split.
-
-Remaining technical risks: no split index artifact was saved, so exactness depends on preserving the original row order and scikit-learn split method (verified here). The SQL installment logic treats a missing `DAYS_ENTRY_PAYMENT` as not late and missing `AMT_PAYMENT` as not underpaid; the database has 2,905 such rows among 13,605,401 installment rows. This is rare (0.021%) but its behavioral meaning should be explicitly decided before using these features in a later production-oriented study. The dataset is a single historical benchmark; validation/test results do not establish out-of-time stability, probability calibration, fairness, or business utility.
-
-## Artifacts and next phase
-
-Machine-readable tables are in `reports/tables/phase8_*.csv`; plots are in `reports/figures/phase8_*.png`. The report, notebook, and these generated outputs are committed. The next step should be to review these results, resolve the installment-missing-payment interpretation, and only then design a controlled nonlinear robustness comparison. Do not treat this ablation as a reason to skip temporal validation or calibration.
+Tables are under `reports/tables/phase8_*.csv`; figures are under `reports/figures/phase8_*.png`. The frozen earlier result is retained in `reports/phase8_benchmark_v1/`. This phase is the controlled linear benchmark for the Phase 9 nonlinear comparison.

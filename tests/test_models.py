@@ -1,4 +1,5 @@
 import tempfile
+import sqlite3
 import unittest
 from pathlib import Path
 
@@ -8,7 +9,7 @@ from sklearn.model_selection import train_test_split
 
 from src.models import (
     APPLICATION_FEATURES, BUREAU_FEATURES, ALTERNATIVE_FEATURES,
-    FEATURE_GROUPS, load_and_split_data, build_pipeline,
+    FEATURE_GROUPS, load_and_split_data, build_pipeline, create_phase7a_split_artifacts,
     thin_file_mask,
 )
 
@@ -17,8 +18,8 @@ class TestFeatureGroupsAndModels(unittest.TestCase):
     def test_feature_groups_are_exact_and_disjoint(self):
         self.assertEqual(len(APPLICATION_FEATURES), 10)
         self.assertEqual(len(BUREAU_FEATURES), 6)
-        self.assertEqual(len(ALTERNATIVE_FEATURES), 7)
-        self.assertEqual(len(set(APPLICATION_FEATURES + BUREAU_FEATURES + ALTERNATIVE_FEATURES)), 23)
+        self.assertEqual(len(ALTERNATIVE_FEATURES), 8)
+        self.assertEqual(len(set(APPLICATION_FEATURES + BUREAU_FEATURES + ALTERNATIVE_FEATURES)), 24)
         self.assertEqual(FEATURE_GROUPS["Application"], APPLICATION_FEATURES)
         self.assertEqual(FEATURE_GROUPS["Application + Bureau"], APPLICATION_FEATURES + BUREAU_FEATURES)
         self.assertEqual(FEATURE_GROUPS["Application + Bureau + Alternative"],
@@ -47,8 +48,15 @@ class TestFeatureGroupsAndModels(unittest.TestCase):
         frame = self._dataset()
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "features.csv"
+            split_dir = Path(tmp) / "splits"
             frame.to_csv(path, index=False)
-            result = load_and_split_data(path)
+            split_ids = create_phase7a_split_artifacts(path, split_dir)
+            result = load_and_split_data(path, split_dir)
+        self.assertEqual([len(split_ids[k]) for k in ("train", "validation", "test")], [420, 90, 90])
+        self.assertEqual(len(set(split_ids["train"]) & set(split_ids["validation"])), 0)
+        self.assertEqual(len(set(split_ids["train"]) & set(split_ids["test"])), 0)
+        self.assertEqual(len(set(split_ids["validation"]) & set(split_ids["test"])), 0)
+        self.assertEqual(len(set.union(*(set(v) for v in split_ids.values()))), len(frame))
         expected = train_test_split(frame[["SK_ID_CURR", *APPLICATION_FEATURES]], frame.TARGET,
                                     test_size=.15, stratify=frame.TARGET, random_state=42)
         X_train_val, X_test, y_train_val, y_test = expected
@@ -90,6 +98,32 @@ class TestFeatureGroupsAndModels(unittest.TestCase):
         np.testing.assert_array_equal(thin_file_mask(frame), [True, False, True, False])
         with self.assertRaises(ValueError):
             thin_file_mask(pd.DataFrame({"PREV_APP_COUNT": [0]}))
+
+    def test_sql_treats_missing_installment_payment_as_unknown(self):
+        conn = sqlite3.connect(":memory:")
+        try:
+            conn.executescript(Path("sql/schema.sql").read_text(encoding="utf-8"))
+            conn.execute("INSERT INTO application_train (SK_ID_CURR, TARGET) VALUES (1,0),(2,1)")
+            conn.executemany(
+                "INSERT INTO installments_payments VALUES (?,?,?,?,?,?)",
+                [(101, 1, -30, -25, 100, 80), (101, 1, -60, -65, 100, 100),
+                 (101, 1, -15, None, 100, None), (101, 1, -10, -12, 100, None)],
+            )
+            conn.executescript(Path("sql/feature_queries.sql").read_text(encoding="utf-8"))
+            observed = conn.execute(
+                "SELECT INST_TOTAL_COUNT, INST_LATE_PAYMENT_COUNT, INST_LATE_PAYMENT_RATIO, "
+                "INST_UNDERPAYMENT_COUNT, INST_PAYMENT_MISSING_COUNT "
+                "FROM feature_master WHERE SK_ID_CURR=1"
+            ).fetchone()
+            no_history = conn.execute(
+                "SELECT INST_TOTAL_COUNT, INST_LATE_PAYMENT_COUNT, INST_LATE_PAYMENT_RATIO, "
+                "INST_UNDERPAYMENT_COUNT, INST_PAYMENT_MISSING_COUNT "
+                "FROM feature_master WHERE SK_ID_CURR=2"
+            ).fetchone()
+            self.assertEqual(observed, (4, 1, 1 / 3, 1, 2))
+            self.assertEqual(no_history, (0, 0, 0, 0, 0))
+        finally:
+            conn.close()
 
 
 if __name__ == "__main__":

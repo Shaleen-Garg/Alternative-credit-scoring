@@ -36,12 +36,12 @@ This document details the quality and distributional findings from the engineere
 |---|---:|---:|---|
 | Application | 10 | Med/High (EXT_SOURCES) | Current application information |
 | Traditional Credit | 6 | 0 | Bureau history |
-| Alternative Behavioural | 7 | 0 | Internal behavioural/payment history |
+| Alternative Behavioural | 8 | Includes undefined observed-payment ratio | Internal behavioural/payment history |
 
 ## 6. History Absence vs Zero Behavior
 The zero-imputation strategy creates a structural ambiguity where `0` can mean either "No historical records exist" or "Historical records exist, but the adverse event count is zero (clean history)".
 - **Evidence**: `INST_LATE_PAYMENT_COUNT` has 152,512 zeros. However, 136,644 of these occur where `INST_TOTAL_COUNT > 0`. Thus, 136,644 represent a perfectly clean payment history, while 15,868 represent a complete lack of installment history.
-- **Phase 8 decision**: The locked 23-feature ablation does not add separate history-presence fields. `INST_TOTAL_COUNT` and `PREV_APP_COUNT` already distinguish absent history from a zero adverse-event count when history exists. The Phase 8 report separately quantifies these states. Missing entry-payment timestamps remain an unresolved feature-definition issue.
+- **Phase 8 decision**: `INST_TOTAL_COUNT` and `PREV_APP_COUNT` distinguish absent history from a zero adverse-event count when history exists. Raw audit found 2,905 installment rows where both actual payment date and amount are missing, with no explanation in the source dictionary. These events are excluded from observed late/underpayment measures and counted in `INST_PAYMENT_MISSING_COUNT`; unknowns are not inferred to be either on-time or unpaid. Where no payment date is observed, the late-payment ratio remains missing and is imputed within the train-fitted pipeline. See `phase8_ablation.md` for the evidence and sensitivity checks.
 
 ## 7. Missingness Analysis
 For the external scores, missingness is not MCAR (Missing Completely At Random). Missingness itself is associated with higher default risk:
