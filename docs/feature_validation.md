@@ -1,6 +1,6 @@
 # Feature validation
 
-The exported modeling table contains 307,511 rows at one row per SK_ID_CURR. TARGET is retained as the outcome column and excluded from predictors. Automated checks found no infinite values or constant predictors.
+The exported modeling table contains 307,511 rows at one row per SK_ID_CURR. TARGET is retained as the outcome column and excluded from predictors. The feature build checks target values, relative event dates, output grain, numeric types, infinite values, and constant predictors; all checks passed on the current source files. The current data contains no positive bureau, prior-decision, installment-due, or payment relative-day values.
 
 ## Missingness and source coverage
 

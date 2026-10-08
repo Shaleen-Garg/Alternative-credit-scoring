@@ -6,7 +6,7 @@ The prediction point is the current application. The modelling population is the
 
 ## Data and feature preparation
 
-Historical bureau, previous-application, and installment records are summarized at applicant level before joining to the current application table. The model table has one row per SK_ID_CURR. TARGET and SK_ID_CURR are excluded from predictor columns. Historical event dates are measured relative to the current application; available source dates were checked for post-application records.
+Historical bureau, previous-application, and installment records are summarized at applicant level before joining to the current application table. The model table has one row per SK_ID_CURR. TARGET and SK_ID_CURR are excluded from predictor columns. The feature build checks bureau, prior-decision, installment-due, and payment dates and stops if any positive relative-day values occur after the current application.
 
 The feature groups are nested:
 
@@ -32,7 +32,7 @@ The split is stratified 70/15/15 at borrower level. Ordered IDs are stored in da
 
 HistGradientBoosting is a nonlinear robustness comparison. Its small candidate set is evaluated using validation performance, and one configuration is applied consistently to feature groups A, B, and C. The selected configuration is learning_rate 0.08, max_iter 200, max_leaf_nodes 15, min_samples_leaf 100, and l2_regularization 2.0; early stopping is disabled and random_state is 42. The employment sentinel 365243 is converted to missing before fitting and prediction.
 
-The calibration analysis selects a model from training and validation metrics, fits the selected sigmoid mapping using validation predictions and outcomes, and reports calibration and ranking metrics. Decision thresholds are selected on validation under explicit illustrative cost ratios or approval-volume targets. Test outcomes are not used to select the model, calibration method, or thresholds.
+The calibration analysis selects a model from training and validation metrics, selects a calibration method on a held-out half of validation, then refits the selected mapping on all validation predictions and outcomes. Decision thresholds are selected on those calibrated validation predictions under explicit illustrative cost ratios or approval-volume targets. Cost minimization checks each distinct validation score boundary and an all-approve cutoff. Validation calibration diagnostics and threshold-cost curves are descriptive for a calibrator fit on the same split. Test outcomes are not used to fit the model or calibrator or to select thresholds.
 
 ## Interpretation of the holdout
 

@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
-from scipy.special import expit, logit
+from scipy.special import logit
 from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import average_precision_score, brier_score_loss, log_loss, roc_auc_score
@@ -24,9 +24,10 @@ def fit_calibrator(method, probabilities, target):
     if method not in {"sigmoid", "isotonic"}:
         raise ValueError("method must be sigmoid or isotonic")
     p = _safe_probabilities(probabilities)
-    y = np.asarray(target, dtype=int).reshape(-1)
-    if len(p) != len(y) or np.unique(y).size != 2:
+    y = np.asarray(target).reshape(-1)
+    if len(p) != len(y) or not np.isin(y, [0, 1]).all() or np.unique(y).size != 2:
         raise ValueError("Calibration fit requires matching probabilities and both target classes")
+    y = y.astype(int)
     if method == "sigmoid":
         # Platt scaling: fit a logistic map from raw prediction log-odds to outcome.
         calibrator = LogisticRegression(C=1e6, solver="lbfgs", max_iter=2000)
@@ -50,10 +51,15 @@ def apply_calibrator(method, calibrator, probabilities):
 
 def calibration_metrics(target, probabilities, n_bins=15):
     """Ranking, proper scoring, bin counts/ECE, and descriptive slope/intercept."""
-    y = np.asarray(target, dtype=int).reshape(-1)
+    y = np.asarray(target).reshape(-1)
     p = _safe_probabilities(probabilities)
     if len(y) != len(p) or len(y) == 0:
         raise ValueError("target and probabilities must have equal non-zero length")
+    if not np.isin(y, [0, 1]).all():
+        raise ValueError("target must contain only 0 and 1")
+    if not isinstance(n_bins, (int, np.integer)) or n_bins < 1:
+        raise ValueError("n_bins must be a positive integer")
+    y = y.astype(int)
     metrics = {
         "n": len(y), "default_rate": float(y.mean()), "calibration_bin_count": int(n_bins),
         "roc_auc": float(roc_auc_score(y, p)) if np.unique(y).size == 2 else np.nan,

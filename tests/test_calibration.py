@@ -7,6 +7,7 @@ import pandas as pd
 from sklearn.metrics import average_precision_score, roc_auc_score
 
 from src.calibration import apply_calibrator, calibration_metrics, fit_calibrator
+from src.evaluation import evaluate_model
 from src.models import FEATURE_GROUPS
 from src.calibration_analysis import select_model_for_calibration
 
@@ -46,6 +47,12 @@ class TestCalibration(unittest.TestCase):
         self.assertIn("calibration_slope", metrics)
         self.assertIn("ece_equal_width", metrics)
         self.assertEqual(int(bins.n.sum()), len(y))
+
+    def test_evaluation_rejects_non_binary_labels_and_misaligned_scores(self):
+        with self.assertRaises(ValueError):
+            evaluate_model([0, 2], [.1, .8])
+        with self.assertRaises(ValueError):
+            evaluate_model([0, 1], [.1])
 
     def test_model_selection_is_invariant_to_test_metrics(self):
         with tempfile.TemporaryDirectory() as tmp:

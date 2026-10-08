@@ -1,4 +1,4 @@
--- Schema definitions for SQLite (used for Feature Engineering pipeline)
+-- SQLite staging tables for the selected Home Credit source columns.
 
 DROP TABLE IF EXISTS application_train;
 CREATE TABLE application_train (
@@ -28,7 +28,8 @@ DROP TABLE IF EXISTS previous_application;
 CREATE TABLE previous_application (
     SK_ID_PREV INTEGER PRIMARY KEY,
     SK_ID_CURR INTEGER,
-    NAME_CONTRACT_STATUS TEXT
+    NAME_CONTRACT_STATUS TEXT,
+    DAYS_DECISION INTEGER
 );
 
 DROP TABLE IF EXISTS installments_payments;

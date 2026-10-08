@@ -12,10 +12,12 @@ from sklearn.metrics import (
 
 
 def evaluate_model(y_true, y_prob):
-    y_true = np.asarray(y_true)
-    y_prob = np.asarray(y_prob)
+    y_true = np.asarray(y_true).reshape(-1)
+    y_prob = np.asarray(y_prob, dtype=float).reshape(-1)
     if len(y_true) != len(y_prob) or len(y_true) == 0:
         raise ValueError("y_true and y_prob must have the same non-zero length")
+    if not np.isin(y_true, [0, 1]).all():
+        raise ValueError("y_true must contain only 0 and 1")
     if not np.isfinite(y_prob).all() or (y_prob < 0).any() or (y_prob > 1).any():
         raise ValueError("Predictions must be finite probabilities in [0, 1]")
     if np.unique(y_true).size != 2:
@@ -51,25 +53,6 @@ def _save(fig, save_path):
         os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
         fig.savefig(save_path, dpi=160, bbox_inches="tight")
     plt.close(fig)
-
-
-def plot_roc_curve(y_true, y_prob, save_path=None):
-    fpr, tpr, _ = roc_curve(y_true, y_prob)
-    fig, ax = plt.subplots()
-    ax.plot(fpr, tpr, label=f"ROC-AUC = {roc_auc_score(y_true, y_prob):.3f}")
-    ax.plot([0, 1], [0, 1], "k--")
-    ax.set(xlabel="False positive rate", ylabel="True positive rate", title="ROC curve")
-    ax.legend()
-    _save(fig, save_path)
-
-
-def plot_pr_curve(y_true, y_prob, save_path=None):
-    precision, recall, _ = precision_recall_curve(y_true, y_prob)
-    fig, ax = plt.subplots()
-    ax.plot(recall, precision, label=f"PR-AUC = {average_precision_score(y_true, y_prob):.3f}")
-    ax.set(xlabel="Recall", ylabel="Precision", title="Precision-recall curve")
-    ax.legend()
-    _save(fig, save_path)
 
 
 def plot_prob_distribution(y_true, y_prob, save_path=None):

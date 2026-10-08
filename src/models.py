@@ -37,6 +37,7 @@ SPLIT_SEED = 42
 SPLIT_DIR = Path("data/processed/splits")
 THIN_FILE_COLUMN = "BUREAU_CREDIT_COUNT"
 THIN_FILE_VALUE = 0
+DAYS_EMPLOYED_SENTINEL = 365243
 
 
 def thin_file_mask(frame):
@@ -156,13 +157,5 @@ class DaysEmployedAnomalyHandler(BaseEstimator, TransformerMixin):
     def transform(self, X):
         X = X.copy()
         if isinstance(X, pd.DataFrame) and "APP_DAYS_EMPLOYED" in X:
-            X.loc[X["APP_DAYS_EMPLOYED"] == 365243, "APP_DAYS_EMPLOYED"] = np.nan
+            X.loc[X["APP_DAYS_EMPLOYED"] == DAYS_EMPLOYED_SENTINEL, "APP_DAYS_EMPLOYED"] = np.nan
         return X
-
-def build_baseline_pipeline():
-    """Build the established logistic baseline pipeline."""
-    return build_pipeline(APPLICATION_FEATURES)
-
-
-def get_constant_baseline_predictions(y_train, n_samples):
-    return np.full(n_samples, y_train.mean())

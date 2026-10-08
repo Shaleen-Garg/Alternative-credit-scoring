@@ -1,22 +1,33 @@
--- Data Quality Checks
+SELECT 'invalid_application_target' AS check_name, COUNT(*) AS violation_count
+FROM application_train
+WHERE TARGET IS NULL OR TARGET NOT IN (0, 1)
 
--- 1. Check uniqueness of application IDs
-SELECT 
-    COUNT(SK_ID_CURR) AS total_rows,
-    COUNT(DISTINCT SK_ID_CURR) AS unique_ids
-FROM application_train;
+UNION ALL
+SELECT 'future_bureau_record', COUNT(*)
+FROM bureau
+WHERE DAYS_CREDIT > 0
 
--- 2. Verify temporal leakage (no future dates in bureau)
-SELECT COUNT(*) AS future_bureau_records
-FROM bureau 
-WHERE DAYS_CREDIT > 0;
+UNION ALL
+SELECT 'future_previous_application', COUNT(*)
+FROM previous_application
+WHERE DAYS_DECISION > 0
 
--- 3. Check for TARGET column leakage in features (ensure TARGET only exists once)
--- (Handled logically in the pipeline, but conceptual query below)
--- SELECT TARGET, COUNT(*) FROM feature_master GROUP BY TARGET;
+UNION ALL
+SELECT 'future_installment_due_date', COUNT(*)
+FROM installments_payments
+WHERE DAYS_INSTALMENT > 0
 
--- 4. Verify thin-file counts match expectation
-SELECT 
-    COUNT(*) as thin_file_count
-FROM feature_master 
-WHERE BUREAU_CREDIT_COUNT = 0;
+UNION ALL
+SELECT 'future_installment_payment_date', COUNT(*)
+FROM installments_payments
+WHERE DAYS_ENTRY_PAYMENT > 0
+
+UNION ALL
+SELECT 'feature_row_count_mismatch', ABS(
+    (SELECT COUNT(*) FROM feature_master) -
+    (SELECT COUNT(*) FROM application_train)
+)
+
+UNION ALL
+SELECT 'duplicate_feature_applicant', COUNT(*) - COUNT(DISTINCT SK_ID_CURR)
+FROM feature_master;

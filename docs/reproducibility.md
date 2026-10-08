@@ -28,7 +28,7 @@ python -m src.release
 python -m pytest -q
 ~~~
 
-The feature builder creates the local SQLite database and applicant-level table. The analysis modules run the controlled feature comparison, nonlinear comparison, calibration, decision, explanation, and stability analyses. The release module assembles the curated tables and figures in reports/results/. The full test suite last passed with 26 tests.
+The feature builder imports source files in chunks, creates a local SQLite database, checks temporal and output invariants, and writes the applicant-level table. The analysis modules run the controlled feature comparison, nonlinear comparison, calibration, decision, explanation, and stability analyses. The release module assembles the curated tables and figures in reports/results/. The full test suite last passed with 30 tests.
 
 ## Generated and committed files
 

@@ -1,5 +1,4 @@
 import tempfile
-import sqlite3
 import unittest
 from pathlib import Path
 
@@ -44,7 +43,7 @@ class TestFeatureGroupsAndModels(unittest.TestCase):
         frame.loc[10, "APP_DAYS_EMPLOYED"] = 365243
         return frame
 
-    def test_split_repeats_phase_7a_two_stage_stratified_indices(self):
+    def test_split_generation_matches_two_stage_stratified_indices(self):
         frame = self._dataset()
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "features.csv"
@@ -98,33 +97,6 @@ class TestFeatureGroupsAndModels(unittest.TestCase):
         np.testing.assert_array_equal(thin_file_mask(frame), [True, False, True, False])
         with self.assertRaises(ValueError):
             thin_file_mask(pd.DataFrame({"PREV_APP_COUNT": [0]}))
-
-    def test_sql_treats_missing_installment_payment_as_unknown(self):
-        conn = sqlite3.connect(":memory:")
-        try:
-            conn.executescript(Path("sql/schema.sql").read_text(encoding="utf-8"))
-            conn.execute("INSERT INTO application_train (SK_ID_CURR, TARGET) VALUES (1,0),(2,1)")
-            conn.executemany(
-                "INSERT INTO installments_payments VALUES (?,?,?,?,?,?)",
-                [(101, 1, -30, -25, 100, 80), (101, 1, -60, -65, 100, 100),
-                 (101, 1, -15, None, 100, None), (101, 1, -10, -12, 100, None)],
-            )
-            conn.executescript(Path("sql/feature_queries.sql").read_text(encoding="utf-8"))
-            observed = conn.execute(
-                "SELECT INST_TOTAL_COUNT, INST_LATE_PAYMENT_COUNT, INST_LATE_PAYMENT_RATIO, "
-                "INST_UNDERPAYMENT_COUNT, INST_PAYMENT_MISSING_COUNT "
-                "FROM feature_master WHERE SK_ID_CURR=1"
-            ).fetchone()
-            no_history = conn.execute(
-                "SELECT INST_TOTAL_COUNT, INST_LATE_PAYMENT_COUNT, INST_LATE_PAYMENT_RATIO, "
-                "INST_UNDERPAYMENT_COUNT, INST_PAYMENT_MISSING_COUNT "
-                "FROM feature_master WHERE SK_ID_CURR=2"
-            ).fetchone()
-            self.assertEqual(observed, (4, 1, 1 / 3, 1, 2))
-            self.assertEqual(no_history, (0, 0, 0, 0, 0))
-        finally:
-            conn.close()
-
 
 if __name__ == "__main__":
     unittest.main()

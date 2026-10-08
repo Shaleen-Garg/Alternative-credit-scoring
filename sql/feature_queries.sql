@@ -1,5 +1,10 @@
 -- Feature Engineering Queries
 
+-- These indexes let SQLite stream applicant-level GROUP BY operations in key order.
+CREATE INDEX IF NOT EXISTS idx_bureau_applicant ON bureau (SK_ID_CURR);
+CREATE INDEX IF NOT EXISTS idx_previous_applicant ON previous_application (SK_ID_CURR);
+CREATE INDEX IF NOT EXISTS idx_installments_applicant ON installments_payments (SK_ID_CURR);
+
 -- 1. Base Application Features
 DROP TABLE IF EXISTS feat_application;
 CREATE TABLE feat_application AS
@@ -57,6 +62,7 @@ SELECT
         AS INST_LATE_PAYMENT_RATIO,
     SUM(CASE WHEN AMT_PAYMENT IS NOT NULL AND AMT_INSTALMENT IS NOT NULL
              AND AMT_PAYMENT < AMT_INSTALMENT THEN 1 ELSE 0 END) AS INST_UNDERPAYMENT_COUNT,
+    -- Keep missing payment records separate from observed on-time payments.
     SUM(CASE WHEN DAYS_ENTRY_PAYMENT IS NULL OR AMT_PAYMENT IS NULL THEN 1 ELSE 0 END)
         AS INST_PAYMENT_MISSING_COUNT
 FROM installments_payments

@@ -22,6 +22,8 @@ Thin-file is defined as BUREAU_CREDIT_COUNT = 0: no bureau records at the curren
 
 The source dataset is relational. The diagram shows logical relationships across its historical tables. The current feature builder uses application_train, bureau, previous_application, and installments_payments. The other competition tables are included here to clarify the full data structure, but are not consumed by this implementation.
 
+Source CSVs are imported in chunks and historical applicant keys are indexed before aggregation. The build checks target values, one-row-per-applicant output, numeric predictors, finite values, and relative dates; any positive event date stops export as a potential post-application leakage path.
+
 ~~~mermaid
 erDiagram
     APPLICATION ||--o{ BUREAU : "SK_ID_CURR"
@@ -114,6 +116,8 @@ The 70/15/15 split IDs are committed under data/processed/splits/ and reused acr
 
 Calibration uses a sigmoid mapping selected on validation predictions and outcomes. Decision thresholds are also selected on validation. Test outcomes are used for final reporting and predefined diagnostics, not model, calibration-method, or threshold selection. The historical test split had been inspected during earlier benchmarking; it is not an untouched confirmatory test.
 
+The selected calibration mapping is refit on all validation predictions before threshold tuning. Validation calibration diagnostics and threshold costs are descriptive for a mapping fit on that same split; the test split remains excluded from model and calibrator fitting and threshold selection.
+
 ~~~mermaid
 flowchart TD
     A[Home Credit source tables] --> B[SQLite relational aggregation]
@@ -183,7 +187,7 @@ For the selected HGB Model C, sigmoid calibration preserves ranking (ROC-AUC 0.7
 
 ![Calibration reliability](reports/results/calibration_reliability.png)
 
-At an illustrative 5:1 false-negative:false-positive normalized cost ratio, validation selected an overall threshold of 0.15. On the historical holdout, Model C approval was 86.03%, default recall 41.78%, defaults among approved 5.46%, and normalized cost 0.3409 per applicant. These values are illustrative, not lending policy, bank economics, or underwriting recommendations.
+At an illustrative 5:1 false-negative:false-positive normalized cost ratio, validation selected an overall threshold of 0.1497 (about 0.15). On the historical holdout, Model C approval was 85.97%, default recall 41.94%, defaults among approved 5.45%, and normalized cost 0.3408 per applicant. Model B at the same cutoff had 86.21% approval, 41.41% default recall, 5.49% defaults among approved, and 0.3410 normalized cost per applicant. These values are illustrative, not lending policy, bank economics, or underwriting recommendations.
 
 At validation-selected cutoffs targeting approximately 70% approval, thin-file results were:
 
@@ -233,7 +237,7 @@ python -m src.release
 python -m pytest -q
 ~~~
 
-The feature builder writes a local SQLite database and data/processed/feature_master.csv. Detailed intermediate outputs are generated under reports/tables/ and reports/figures/ and are not tracked. Curated tables and figures are stored under reports/results/. The test suite last passed with 26 tests. See [reproduction details](docs/reproducibility.md).
+The feature builder writes a local SQLite database and data/processed/feature_master.csv. Detailed intermediate outputs are generated under reports/tables/ and reports/figures/ and are not tracked. Curated tables and figures are stored under reports/results/. The test suite last passed with 30 tests. See [reproduction details](docs/reproducibility.md).
 
 ## Repository structure
 

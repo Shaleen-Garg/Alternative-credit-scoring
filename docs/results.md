@@ -52,7 +52,7 @@ Calibration improvement is modest and mixed rather than perfect: thin-file Brier
 
 ## Illustrative decision analysis
 
-Under an illustrative false-negative:false-positive cost ratio of 5:1, validation selects an overall threshold of 0.15. On the historical holdout, Model C has 86.03% approval, 41.78% default recall, 5.46% defaults among approved, and 0.3409 normalized cost per applicant. Model B at the same cutoff has 86.26% approval, 41.27% default recall, 5.50% defaults among approved, and 0.3411 normalized cost.
+Under an illustrative false-negative:false-positive cost ratio of 5:1, validation selects an overall threshold of 0.1497 (about 0.15). On the historical holdout, Model C has 85.97% approval, 41.94% default recall, 5.45% defaults among approved, and 0.3408 normalized cost per applicant. Model B at the same cutoff has 86.21% approval, 41.41% default recall, 5.49% defaults among approved, and 0.3410 normalized cost.
 
 At cutoffs selected on validation to target approximately 70% approval, thin-file holdout results are:
 

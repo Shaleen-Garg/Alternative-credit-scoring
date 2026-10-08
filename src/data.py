@@ -1,27 +1,26 @@
-"""
-Data loading and database management module.
-"""
+"""CSV loading and SQLite setup helpers."""
+
 import pandas as pd
 import sqlite3
-import os
-import gc
 
 def create_connection(db_file=":memory:"):
-    """Create a database connection to SQLite."""
-    conn = sqlite3.connect(db_file)
-    return conn
+    return sqlite3.connect(db_file)
 
 def init_db(conn, schema_path="sql/schema.sql"):
-    """Initialize database schema."""
-    with open(schema_path, "r") as f:
-        schema = f.read()
+    with open(schema_path, encoding="utf-8") as schema_file:
+        schema = schema_file.read()
     conn.executescript(schema)
     conn.commit()
 
-def load_csv_to_sqlite(conn, csv_path, table_name, usecols=None):
-    """Load raw CSV data into the SQLite database."""
+def load_csv_to_sqlite(conn, csv_path, table_name, usecols=None,
+                       read_chunk_size=250_000, insert_chunk_size=10_000):
+    if read_chunk_size < 1 or insert_chunk_size < 1:
+        raise ValueError("CSV chunk sizes must be positive")
     print(f"Loading {table_name} into DB...")
-    df = pd.read_csv(csv_path, usecols=usecols)
-    df.to_sql(table_name, conn, if_exists="append", index=False)
-    del df
-    gc.collect()
+    row_count = 0
+    for chunk in pd.read_csv(csv_path, usecols=usecols, chunksize=read_chunk_size):
+        chunk.to_sql(table_name, conn, if_exists="append", index=False,
+                     chunksize=insert_chunk_size)
+        row_count += len(chunk)
+    if row_count == 0:
+        raise ValueError(f"Source file contains no data rows: {csv_path}")

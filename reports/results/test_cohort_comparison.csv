@@ -1,37 +1,37 @@
-split,cohort,model,n,roc_auc,pr_auc,brier,log_loss,default_rate
-test,Overall,Application + Bureau,46127,0.7490049856128321,0.2385133469038327,0.0681274004830059,0.2482115376146462,0.0807336267262124
-test,Overall,Application + Bureau + Alternative,46127,0.7579041587379324,0.2509442319102656,0.0675370473966428,0.2455375024267146,0.0807336267262124
-test,Thin-file,Application + Bureau,6534,0.7179431117424854,0.2415745522984776,0.0845538955895496,0.2980545129355637,0.1008570554025099
-test,Thin-file,Application + Bureau + Alternative,6534,0.737646595421819,0.2786696131931878,0.0826618082194458,0.2911873369330918,0.1008570554025099
-test,Non-thin-file,Application + Bureau,39593,0.7527995954208674,0.2383439046955325,0.0654165495996135,0.2399859926762259,0.0774126739575177
-test,Non-thin-file,Application + Bureau + Alternative,39593,0.7601623086162779,0.2456524777612921,0.0650410206440301,0.2380039480442564,0.0774126739575177
-test,APP_EXT_SOURCE_1: missing,Application + Bureau,26172,0.7450193233324168,0.2427816376575785,0.0716448420664698,0.2587357186530274,0.0852437719700443
-test,APP_EXT_SOURCE_1: missing,Application + Bureau + Alternative,26172,0.7564554286496663,0.2596630689031765,0.0708170120407995,0.2551148317107813,0.0852437719700443
-test,APP_EXT_SOURCE_1: present,Application + Bureau,19955,0.752806456127947,0.2325290726987115,0.0635140964929072,0.2344085375576925,0.0748183412678526
-test,APP_EXT_SOURCE_1: present,Application + Bureau + Alternative,19955,0.7583064302606545,0.2383881954265877,0.0632352065213298,0.2329763467252567,0.0748183412678526
-test,APP_EXT_SOURCE_2: missing,Application + Bureau,100,0.4877717391304347,0.0936565445631426,0.0760503256076351,0.2998433907241258,0.08
-test,APP_EXT_SOURCE_2: missing,Application + Bureau + Alternative,100,0.5230978260869565,0.1823815690930516,0.0727477660816316,0.2902788874942754,0.08
-test,APP_EXT_SOURCE_2: present,Application + Bureau,46027,0.7495002183966646,0.2388205411639938,0.0681101868363971,0.2480993602989196,0.0807352206313685
-test,APP_EXT_SOURCE_2: present,Application + Bureau + Alternative,46027,0.7583338826429007,0.2511479454350934,0.0675257263922649,0.2454402956023126,0.0807352206313685
-test,APP_EXT_SOURCE_3: missing,Application + Bureau,9040,0.7184531351001938,0.2275374935438755,0.0796967030824662,0.2843131513152975,0.0940265486725663
-test,APP_EXT_SOURCE_3: missing,Application + Bureau + Alternative,9040,0.733583423112835,0.2603216416452618,0.0782035512040274,0.2789848758107358,0.0940265486725663
-test,APP_EXT_SOURCE_3: present,Application + Bureau,37087,0.7553126844779221,0.2419121812458766,0.0653073693265597,0.2394117266875319,0.0774934613206784
-test,APP_EXT_SOURCE_3: present,Application + Bureau + Alternative,37087,0.7629565779944101,0.2489710006476306,0.0649370745107594,0.2373846657078765,0.0774934613206784
-test,Age <25,Application + Bureau,1752,0.6943680419122462,0.2445386563825572,0.1062945035885257,0.3582802003293706,0.1284246575342466
-test,Age <25,Application + Bureau + Alternative,1752,0.6954289456450555,0.2501538426163314,0.1056438599459029,0.3562410180556059,0.1284246575342466
-test,Age 25-34,Application + Bureau,10767,0.7456882727564291,0.286518031576233,0.0859413547963013,0.2987239538872056,0.1061577040958484
-test,Age 25-34,Application + Bureau + Alternative,10767,0.7548086258544366,0.3000197799114961,0.0850564729721541,0.2954757902518415,0.1061577040958484
-test,Age 35-44,Application + Bureau,12609,0.7497928526289557,0.2261410882111884,0.068410864323446,0.2485214472346967,0.0804187485129669
-test,Age 35-44,Application + Bureau + Alternative,12609,0.7602231118799933,0.2378747488897202,0.0678199495213021,0.2455903712045118,0.0804187485129669
-test,Age 45-54,Application + Bureau,10577,0.7525036287637761,0.2272984376679078,0.062289305089845,0.2309001231127679,0.0728940153162522
-test,Age 45-54,Application + Bureau + Alternative,10577,0.7635978448833438,0.2421683910801579,0.0616985136402883,0.2279235831996058,0.0728940153162522
-test,Age 55+,Application + Bureau,10422,0.7055569313773474,0.1773242366712101,0.0488896081856763,0.1947177454158654,0.0547879485703319
-test,Age 55+,Application + Bureau + Alternative,10422,0.7152957348200979,0.1877952681034989,0.0486147933084926,0.1931481046960417,0.0547879485703319
-test,Employment Sentinel-coded,Application + Bureau,8492,0.7164614951630268,0.175592270498872,0.0492174270215347,0.1946915346465604,0.0552284503061705
-test,Employment Sentinel-coded,Application + Bureau + Alternative,8492,0.7258008492109704,0.1900287388930647,0.0488913796053581,0.1930202796718455,0.0552284503061705
-test,Employment <1 year,Application + Bureau,4143,0.7409720296526353,0.2763434436165333,0.0859921004883525,0.2997001518733327,0.1057204923968139
-test,Employment <1 year,Application + Bureau + Alternative,4143,0.7389132296846789,0.2819816703220762,0.0857761040592142,0.2995840640907148,0.1057204923968139
-test,Employment 1-4 years,Application + Bureau,16145,0.7352234278422951,0.2698801288643004,0.0870964702717205,0.3029941959888077,0.1064106534530814
-test,Employment 1-4 years,Application + Bureau + Alternative,16145,0.7458980392878346,0.2852816283175619,0.086163881211595,0.2993257302458133,0.1064106534530814
-test,Employment 5+ years,Application + Bureau,17347,0.7453796231209697,0.1962871132588851,0.055463217095323,0.2111278065303324,0.0633538940450798
-test,Employment 5+ years,Application + Bureau + Alternative,17347,0.7576005714877094,0.2065977100147689,0.0549725905561604,0.2082774812427087,0.0633538940450798
+split,cohort,model,n,score_data_status,roc_auc,pr_auc,brier,log_loss,default_rate
+test,Overall,Application + Bureau,46127,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7490049856128321,0.2385133469038327,0.0681274004830059,0.2482115376146462,0.0807336267262124
+test,Overall,Application + Bureau + Alternative,46127,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7579041587379324,0.2509442319102656,0.0675370473966428,0.2455375024267146,0.0807336267262124
+test,Thin-file,Application + Bureau,6534,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7179431117424854,0.2415745522984776,0.0845538955895496,0.2980545129355637,0.1008570554025099
+test,Thin-file,Application + Bureau + Alternative,6534,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.737646595421819,0.2786696131931878,0.0826618082194458,0.2911873369330918,0.1008570554025099
+test,Non-thin-file,Application + Bureau,39593,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7527995954208674,0.2383439046955325,0.0654165495996135,0.2399859926762259,0.0774126739575177
+test,Non-thin-file,Application + Bureau + Alternative,39593,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7601623086162779,0.2456524777612921,0.0650410206440301,0.2380039480442564,0.0774126739575177
+test,APP_EXT_SOURCE_1: missing,Application + Bureau,26172,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7450193233324168,0.2427816376575785,0.0716448420664698,0.2587357186530274,0.0852437719700443
+test,APP_EXT_SOURCE_1: missing,Application + Bureau + Alternative,26172,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7564554286496663,0.2596630689031765,0.0708170120407995,0.2551148317107813,0.0852437719700443
+test,APP_EXT_SOURCE_1: present,Application + Bureau,19955,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.752806456127947,0.2325290726987115,0.0635140964929072,0.2344085375576925,0.0748183412678526
+test,APP_EXT_SOURCE_1: present,Application + Bureau + Alternative,19955,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7583064302606545,0.2383881954265877,0.0632352065213298,0.2329763467252567,0.0748183412678526
+test,APP_EXT_SOURCE_2: missing,Application + Bureau,100,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.4877717391304347,0.0936565445631426,0.0760503256076351,0.2998433907241258,0.08
+test,APP_EXT_SOURCE_2: missing,Application + Bureau + Alternative,100,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.5230978260869565,0.1823815690930516,0.0727477660816316,0.2902788874942754,0.08
+test,APP_EXT_SOURCE_2: present,Application + Bureau,46027,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7495002183966646,0.2388205411639938,0.0681101868363971,0.2480993602989196,0.0807352206313685
+test,APP_EXT_SOURCE_2: present,Application + Bureau + Alternative,46027,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7583338826429007,0.2511479454350934,0.0675257263922649,0.2454402956023126,0.0807352206313685
+test,APP_EXT_SOURCE_3: missing,Application + Bureau,9040,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7184531351001938,0.2275374935438755,0.0796967030824662,0.2843131513152975,0.0940265486725663
+test,APP_EXT_SOURCE_3: missing,Application + Bureau + Alternative,9040,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.733583423112835,0.2603216416452618,0.0782035512040274,0.2789848758107358,0.0940265486725663
+test,APP_EXT_SOURCE_3: present,Application + Bureau,37087,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7553126844779221,0.2419121812458766,0.0653073693265597,0.2394117266875319,0.0774934613206784
+test,APP_EXT_SOURCE_3: present,Application + Bureau + Alternative,37087,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7629565779944101,0.2489710006476306,0.0649370745107594,0.2373846657078765,0.0774934613206784
+test,Age <25,Application + Bureau,1752,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.6943680419122462,0.2445386563825572,0.1062945035885257,0.3582802003293706,0.1284246575342466
+test,Age <25,Application + Bureau + Alternative,1752,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.6954289456450555,0.2501538426163314,0.1056438599459029,0.3562410180556059,0.1284246575342466
+test,Age 25-34,Application + Bureau,10767,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7456882727564291,0.286518031576233,0.0859413547963013,0.2987239538872056,0.1061577040958484
+test,Age 25-34,Application + Bureau + Alternative,10767,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7548086258544366,0.3000197799114961,0.0850564729721541,0.2954757902518415,0.1061577040958484
+test,Age 35-44,Application + Bureau,12609,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7497928526289557,0.2261410882111884,0.068410864323446,0.2485214472346967,0.0804187485129669
+test,Age 35-44,Application + Bureau + Alternative,12609,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7602231118799933,0.2378747488897202,0.0678199495213021,0.2455903712045118,0.0804187485129669
+test,Age 45-54,Application + Bureau,10577,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7525036287637761,0.2272984376679078,0.062289305089845,0.2309001231127679,0.0728940153162522
+test,Age 45-54,Application + Bureau + Alternative,10577,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7635978448833438,0.2421683910801579,0.0616985136402883,0.2279235831996058,0.0728940153162522
+test,Age 55+,Application + Bureau,10422,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7055569313773474,0.1773242366712101,0.0488896081856763,0.1947177454158654,0.0547879485703319
+test,Age 55+,Application + Bureau + Alternative,10422,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7152957348200979,0.1877952681034989,0.0486147933084926,0.1931481046960417,0.0547879485703319
+test,Employment Sentinel-coded,Application + Bureau,8492,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7164614951630268,0.175592270498872,0.0492174270215347,0.1946915346465604,0.0552284503061705
+test,Employment Sentinel-coded,Application + Bureau + Alternative,8492,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7258008492109704,0.1900287388930647,0.0488913796053581,0.1930202796718455,0.0552284503061705
+test,Employment <1 year,Application + Bureau,4143,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7409720296526353,0.2763434436165333,0.0859921004883525,0.2997001518733327,0.1057204923968139
+test,Employment <1 year,Application + Bureau + Alternative,4143,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7389132296846789,0.2819816703220762,0.0857761040592142,0.2995840640907148,0.1057204923968139
+test,Employment 1-4 years,Application + Bureau,16145,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7352234278422951,0.2698801288643004,0.0870964702717205,0.3029941959888077,0.1064106534530814
+test,Employment 1-4 years,Application + Bureau + Alternative,16145,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7458980392878346,0.2852816283175619,0.086163881211595,0.2993257302458133,0.1064106534530814
+test,Employment 5+ years,Application + Bureau,17347,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7453796231209697,0.1962871132588851,0.055463217095323,0.2111278065303324,0.0633538940450798
+test,Employment 5+ years,Application + Bureau + Alternative,17347,Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking,0.7576005714877094,0.2065977100147689,0.0549725905561604,0.2082774812427087,0.0633538940450798

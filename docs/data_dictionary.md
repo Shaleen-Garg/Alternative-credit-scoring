@@ -16,4 +16,4 @@ POS_CASH_balance, credit_card_balance, and installments_payments also carry SK_I
 
 TARGET is the supplied payment-difficulty outcome in application_train. TARGET equals 1 for applicants meeting the competition's payment-difficulty definition and 0 otherwise. It is used as the label, never as an input feature.
 
-The feature pipeline currently consumes application_train, bureau, previous_application, and installments_payments. The other listed files provide context about the wider competition dataset and are not required by the current feature builder.
+The feature pipeline currently consumes application_train, bureau, previous_application, and installments_payments. DAYS_DECISION is loaded only to check that prior-application records predate the current application; it is not a predictor. The other listed files provide context about the wider competition dataset and are not required by the current feature builder.

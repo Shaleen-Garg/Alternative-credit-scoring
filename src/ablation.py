@@ -5,7 +5,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import average_precision_score, roc_auc_score
 
 from src.evaluation import (
     evaluate_model, extract_coefficients, plot_coefficients, plot_metric_bars,
@@ -15,23 +14,6 @@ from src.models import FEATURE_GROUPS, load_and_split_data, build_pipeline, thin
 
 
 MODEL_KEYS = list(FEATURE_GROUPS)
-
-
-def _bootstrap_delta(y, first, second, seed=42, repetitions=2000):
-    """Percentile interval for paired second-minus-first metric difference."""
-    y = np.asarray(y)
-    first, second = np.asarray(first), np.asarray(second)
-    rng = np.random.default_rng(seed)
-    n = len(y)
-    deltas = {"roc_auc": [], "pr_auc": []}
-    for _ in range(repetitions):
-        idx = rng.integers(0, n, n)
-        if np.unique(y[idx]).size < 2:
-            continue
-        deltas["roc_auc"].append(roc_auc_score(y[idx], second[idx]) - roc_auc_score(y[idx], first[idx]))
-        deltas["pr_auc"].append(average_precision_score(y[idx], second[idx]) - average_precision_score(y[idx], first[idx]))
-    return {metric: (float(np.quantile(values, .025)), float(np.quantile(values, .975)))
-            for metric, values in deltas.items()}
 
 
 def run_ablation(filepath="data/processed/feature_master.csv", output_dir="reports",
@@ -61,8 +43,6 @@ def run_ablation(filepath="data/processed/feature_master.csv", output_dir="repor
     metrics = pd.DataFrame(metric_rows)
     metrics.to_csv(tables / "ablation_split_metrics.csv", index=False)
 
-    thin = thin_file_mask(X_test).to_numpy()
-    cohorts = {"Overall": np.ones(len(X_test), dtype=bool), "Thin-file": thin, "Non-thin-file": ~thin}
     subset_rows = []
     for split in ("validation", "test"):
         X_split, y_split = splits[split]
@@ -99,6 +79,13 @@ def run_ablation(filepath="data/processed/feature_master.csv", output_dir="repor
 
     predictions_test = predictions["test"]
     y_test_np = y_test.to_numpy()
+    frozen_predictions = pd.DataFrame({
+        "SK_ID_CURR": X_test["SK_ID_CURR"].to_numpy(),
+        "TARGET": y_test_np,
+        **predictions_test,
+    })
+    frozen_predictions.to_csv(tables / "ablation_test_predictions.csv", index=False)
+    thin = thin_file_mask(X_test).to_numpy()
     plot_model_comparison(y_test_np, predictions_test, figures / "ablation_roc_curves.png", "roc_auc")
     plot_model_comparison(y_test_np, predictions_test, figures / "ablation_pr_curves.png", "pr_auc")
     plot_metric_bars(summary.rename(columns={"test_roc_auc": "roc_auc"}), "roc_auc", figures / "ablation_test_roc_auc.png")
@@ -147,7 +134,8 @@ def run_ablation(filepath="data/processed/feature_master.csv", output_dir="repor
     coverage_table.to_csv(tables / "alternative_history_coverage.csv", index=False)
 
     alt = X_test.loc[thin, ["INST_TOTAL_COUNT", "INST_LATE_PAYMENT_COUNT", "INST_LATE_PAYMENT_RATIO", "INST_UNDERPAYMENT_COUNT"]]
-    alt.corr(method="pearson").to_csv(tables / "installment_correlations_thin_file.csv")
+    correlations = alt.corr(method="pearson")
+    correlations.to_csv(tables / "installment_correlations_thin_file.csv")
     redundant_features = ["INST_TOTAL_COUNT", "INST_LATE_PAYMENT_COUNT",
                           "INST_LATE_PAYMENT_RATIO", "INST_UNDERPAYMENT_COUNT"]
     sensitivity_rows = []
@@ -173,20 +161,9 @@ def run_ablation(filepath="data/processed/feature_master.csv", output_dir="repor
                 row["delta_thin_file_pr_auc_vs_full"] = thin_values["pr_auc"] - full_thin.pr_auc
             sensitivity_rows.append(row)
     pd.DataFrame(sensitivity_rows).to_csv(tables / "ablation_redundancy_sensitivity.csv", index=False)
-    bootstrap_repetitions = 2000
-    ci_overall = _bootstrap_delta(y_test_np, predictions_test[MODEL_KEYS[1]], predictions_test[MODEL_KEYS[2]], repetitions=bootstrap_repetitions)
-    ci_thin = _bootstrap_delta(y_test_np[thin], predictions_test[MODEL_KEYS[1]][thin], predictions_test[MODEL_KEYS[2]][thin], repetitions=bootstrap_repetitions)
-    pd.DataFrame([
-        {"cohort": cohort, "metric": metric, "resamples": bootstrap_repetitions,
-         "ci_2_5_pct": interval[0], "ci_97_5_pct": interval[1]}
-        for cohort, intervals in [("Overall test", ci_overall), ("Thin-file test", ci_thin)]
-        for metric, interval in intervals.items()
-    ]).to_csv(tables / "ablation_bootstrap_intervals.csv", index=False)
-
     return {"splits": (X_train, X_val, X_test), "metrics": metrics, "subsets": subset_metrics,
             "summary": summary, "increments": increments, "coefficients": coeff,
-            "coverage": coverage_table, "correlations": alt.corr(),
-            "ci_overall": ci_overall, "ci_thin": ci_thin}
+            "coverage": coverage_table, "correlations": correlations}
 
 
 if __name__ == "__main__":

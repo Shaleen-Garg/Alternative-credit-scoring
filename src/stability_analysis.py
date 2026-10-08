@@ -9,7 +9,7 @@ from sklearn.metrics import average_precision_score, roc_auc_score
 
 from src.evaluation import evaluate_model
 from src.frozen_model import fit_hgb_with_validation_sigmoid
-from src.models import load_and_split_data, thin_file_mask
+from src.models import DAYS_EMPLOYED_SENTINEL, load_and_split_data, thin_file_mask
 
 
 MODEL_B = "Application + Bureau"
@@ -43,14 +43,17 @@ def _cohorts(frame):
     employed = frame.APP_DAYS_EMPLOYED
     years = employed.abs() / 365.25
     employment_group = pd.Series(np.select(
-        [employed.eq(365243), years < 1, years < 5],
-        ["Sentinel-coded", "<1 year", "1-4 years"], default="5+ years"), index=frame.index)
-    for label in ("Sentinel-coded", "<1 year", "1-4 years", "5+ years"):
+        [employed.isna(), employed.eq(DAYS_EMPLOYED_SENTINEL), years < 1, years < 5],
+        ["Missing", "Sentinel-coded", "<1 year", "1-4 years"], default="5+ years"),
+        index=frame.index)
+    for label in ("Missing", "Sentinel-coded", "<1 year", "1-4 years", "5+ years"):
         result[f"Employment {label}"] = employment_group.eq(label).to_numpy()
     return result
 
 
 def _psi(train, current, bins=10):
+    if bins < 1:
+        raise ValueError("bins must be positive")
     train = pd.Series(train, dtype=float)
     current = pd.Series(current, dtype=float)
     valid = train.dropna()
@@ -74,6 +77,12 @@ def _paired_bootstrap_deltas(y, p_b, p_c, n_bootstraps=500, seed=42):
     """Stratified paired bootstrap intervals for fixed predictions, no refitting."""
     y = np.asarray(y, dtype=int)
     p_b, p_c = np.asarray(p_b), np.asarray(p_c)
+    if len(y) == 0 or len(y) != len(p_b) or len(y) != len(p_c):
+        raise ValueError("Targets and paired predictions must have equal non-zero length")
+    if not np.isin(y, [0, 1]).all() or np.unique(y).size != 2:
+        raise ValueError("Bootstrap evaluation requires both binary target classes")
+    if n_bootstraps < 1:
+        raise ValueError("n_bootstraps must be positive")
     negative, positive = np.flatnonzero(y == 0), np.flatnonzero(y == 1)
     rng = np.random.default_rng(seed)
     differences = []
@@ -112,6 +121,11 @@ def run_stability_analysis(filepath="data/processed/feature_master.csv", split_d
             predictions[split][group] = models[group]["predict"](frame)
 
     performance_rows = []
+    score_status = {
+        "train": "Base model fit on training; scores are in-sample",
+        "validation": "Validation labels fit the sigmoid calibrator; metrics are descriptive",
+        "test": "Historical holdout; outcomes excluded from fitting/selection but inspected in earlier benchmarking",
+    }
     for split, frame in frames.items():
         for cohort, mask in _cohorts(frame).items():
             if not mask.any():
@@ -119,6 +133,7 @@ def run_stability_analysis(filepath="data/processed/feature_master.csv", split_d
             for group in (MODEL_B, MODEL_C):
                 performance_rows.append({"split": split, "cohort": cohort,
                                          "model": group, "n": int(mask.sum()),
+                                         "score_data_status": score_status[split],
                                          **_safe_metrics(targets[split][mask], predictions[split][group][mask])})
     performance = pd.DataFrame(performance_rows)
     performance.to_csv(tables / "cohort_performance.csv", index=False)
@@ -174,7 +189,7 @@ def run_stability_analysis(filepath="data/processed/feature_master.csv", split_d
                                     "share_above_0_5": float(np.mean(p > .5)),
                                     "share_below_0_001": float(np.mean(p < .001)),
                                     "share_above_0_99": float(np.mean(p > .99)),
-                                    "note": "train predictions are in-sample; validation/test are held-out"})
+                                    "note": score_status[split]})
     prediction_stability = pd.DataFrame(prediction_rows)
     prediction_stability.to_csv(tables / "prediction_stability.csv", index=False)
 

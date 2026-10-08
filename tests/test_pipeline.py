@@ -4,9 +4,15 @@ import numpy as np
 import pandas as pd
 
 from src.nonlinear import _new_model, _tree_features
+from src.explainability import _reason
 
 
 class TestNonlinearPipeline(unittest.TestCase):
+    def test_local_explanation_distinguishes_zero_effect_from_direction(self):
+        self.assertIn("unchanged", _reason("APP_INCOME_TOTAL", 0.0))
+        self.assertIn("raises", _reason("APP_INCOME_TOTAL", 0.01))
+        self.assertIn("lowers", _reason("APP_INCOME_TOTAL", -0.01))
+
     def test_tree_inputs_preserve_nan_and_convert_employment_sentinel(self):
         frame = pd.DataFrame({"APP_DAYS_EMPLOYED": [365243, -100, np.nan],
                               "BUREAU_DEBT_RATIO": [np.nan, 0.2, 0.4]})

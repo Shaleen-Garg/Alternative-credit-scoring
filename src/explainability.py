@@ -44,9 +44,11 @@ def _feature_group(feature):
     return "Other"
 
 
-def _reason(feature, sign):
+def _reason(feature, delta):
     label = FEATURE_LABELS.get(feature, feature.replace("_", " ").title())
-    direction = "raises" if sign > 0 else "lowers"
+    if np.isclose(delta, 0.0, atol=1e-12):
+        return f"Replacing {label} with the training median leaves this borrower's model PD unchanged."
+    direction = "raises" if delta > 0 else "lowers"
     return f"{label} {direction} this borrower's model PD relative to replacing it with the training median."
 
 
@@ -126,13 +128,18 @@ def run_explainability_analysis(filepath="data/processed/feature_master.csv", sp
             changed.loc[:, feature] = reference[feature]
             replacement_pd = bundle["predict"](changed)
             delta = float(original_pd - replacement_pd[0])
+            direction = (
+                "no change relative to median" if np.isclose(delta, 0.0, atol=1e-12)
+                else "raises risk vs median" if delta > 0
+                else "lowers risk vs median"
+            )
             local_rows.append({"cohort": ex.cohort, "risk_band": ex.risk_band,
                                "SK_ID_CURR": ex.SK_ID_CURR, "predicted_PD": original_pd,
                                "feature": feature, "feature_group": _feature_group(feature),
                                "observed_value": row.iloc[0][feature],
                                "training_median_replacement": reference[feature],
                                "PD_change_vs_median_replacement": delta,
-                               "direction": "raises risk vs median" if delta > 0 else "lowers risk vs median",
+                               "direction": direction,
                                "reason_code": _reason(feature, delta)})
     local = pd.DataFrame(local_rows)
     local.to_csv(tables / "local_feature_replacements.csv", index=False)

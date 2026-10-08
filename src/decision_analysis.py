@@ -11,14 +11,34 @@ from src.models import load_and_split_data, thin_file_mask
 
 
 COST_RATIOS = (1, 2, 5, 10)  # C_FN:C_FP, in normalized cost units
-THRESHOLDS = np.round(np.arange(0.01, 0.501, 0.01), 2)
+THRESHOLDS = np.round(np.linspace(0.0, 1.0, 101), 2)
 MODEL_B = "Application + Bureau"
 MODEL_C = "Application + Bureau + Alternative"
 
 
+def _decision_arrays(y, pd_hat):
+    y = np.asarray(y).reshape(-1)
+    pd_hat = np.asarray(pd_hat, dtype=float).reshape(-1)
+    if len(y) == 0 or len(y) != len(pd_hat):
+        raise ValueError("Targets and probabilities must have equal non-zero length")
+    if not np.isin(y, [0, 1]).all():
+        raise ValueError("Targets must contain only 0 and 1")
+    if not np.isfinite(pd_hat).all() or ((pd_hat < 0) | (pd_hat > 1)).any():
+        raise ValueError("Predictions must be finite probabilities in [0, 1]")
+    return y.astype(int), pd_hat
+
+
+def _validate_costs(fn_cost, fp_cost):
+    costs = np.asarray([fn_cost, fp_cost], dtype=float)
+    if not np.isfinite(costs).all() or (costs < 0).any():
+        raise ValueError("Decision costs must be finite and non-negative")
+
+
 def decision_metrics(y, pd_hat, threshold, fn_cost=1, fp_cost=1):
-    y = np.asarray(y, dtype=int)
-    pd_hat = np.asarray(pd_hat, dtype=float)
+    y, pd_hat = _decision_arrays(y, pd_hat)
+    _validate_costs(fn_cost, fp_cost)
+    if not np.isfinite(threshold):
+        raise ValueError("Threshold must be finite")
     predicted_default = pd_hat >= threshold
     tp = int(np.sum(predicted_default & (y == 1)))
     fp = int(np.sum(predicted_default & (y == 0)))
@@ -36,6 +56,23 @@ def decision_metrics(y, pd_hat, threshold, fn_cost=1, fp_cost=1):
         "expected_cost": fn * fn_cost + fp * fp_cost,
         "normalized_expected_cost": (fn * fn_cost + fp * fp_cost) / len(y) if len(y) else np.nan,
     }
+
+
+def _select_cost_threshold(y, pd_hat, fn_cost, fp_cost=1):
+    y, pd_hat = _decision_arrays(y, pd_hat)
+    _validate_costs(fn_cost, fp_cost)
+    order = np.argsort(pd_hat, kind="stable")
+    sorted_probabilities = pd_hat[order]
+    sorted_targets = y[order]
+    thresholds = np.append(np.unique(sorted_probabilities),
+                           np.nextafter(sorted_probabilities[-1], np.inf))
+    approved_count = np.searchsorted(sorted_probabilities, thresholds, side="left")
+    approved_defaults = np.r_[0, np.cumsum(sorted_targets == 1)][approved_count]
+    approved_nondefaults = np.r_[0, np.cumsum(sorted_targets == 0)][approved_count]
+    rejected_nondefaults = int(np.sum(y == 0)) - approved_nondefaults
+    costs = (approved_defaults * fn_cost + rejected_nondefaults * fp_cost) / len(y)
+    best = np.lexsort((-thresholds, costs))[0]
+    return decision_metrics(y, pd_hat, thresholds[best], fn_cost, fp_cost)
 
 
 def _cohort_masks(frame):
@@ -78,10 +115,10 @@ def run_decision_analysis(filepath="data/processed/feature_master.csv", split_di
     selected_rows = []
     for ratio in COST_RATIOS:
         for cohort, mask in masks["validation"].items():
-            candidates = [decision_metrics(y_val.to_numpy()[mask], predictions["validation"][MODEL_C][mask],
-                                           threshold, fn_cost=ratio, fp_cost=1)
-                          for threshold in THRESHOLDS]
-            best = min(candidates, key=lambda x: (x["normalized_expected_cost"], -x["threshold"]))
+            best = _select_cost_threshold(
+                y_val.to_numpy()[mask], predictions["validation"][MODEL_C][mask],
+                fn_cost=ratio, fp_cost=1,
+            )
             selected_rows.append({"model_used_for_threshold_selection": MODEL_C, "cohort": cohort,
                                   "FN_to_FP_cost_ratio": f"{ratio}:1", **best,
                                   "selection_data": "validation only"})
